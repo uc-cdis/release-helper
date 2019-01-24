@@ -38,7 +38,10 @@ class ReleaseNotes(object):
             raise NotImplementedError()
 
         if file:
-            print("Exporting release notes into file: {}".format(file))
+            dir_path = os.path.dirname(os.path.realpath(__file__))
+            print(
+                "Exporting release notes into file:\n{}\n".format(dir_path + "/" + file)
+            )
             with open(file, "w+") as output_file:
                 output_file.write(output)
 
