@@ -190,7 +190,9 @@ def get_command_line_args():
     return args
 
 
-def main(args):
+def main(args=None):
+    if args is None:
+        args = get_command_line_args()
     if args.github_access_token:
         g = Github(args.github_access_token)
     else:
@@ -335,5 +337,4 @@ def parse_line(line):
 
 
 if __name__ == "__main__":
-    args = get_command_line_args()
-    main(args)
+    main()
