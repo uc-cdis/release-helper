@@ -3,13 +3,14 @@ Script that pulls specifically formatted PR descriptions
 to create release notes.
 """
 
-import os
-from enum import Enum
-import requests
-import json
-from github import Github
 import argparse
+import json
+import os
 from datetime import datetime
+
+import requests
+from enum import Enum
+from github import Github
 
 
 class ReleaseNotes(object):
