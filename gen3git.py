@@ -288,6 +288,7 @@ def get_pr_descriptions_since_date(
     response = requests.post(
         "https://api.github.com/graphql", headers=headers, data=data
     )
+    response.raise_for_status()
     prs = response.json().get("data", {}).get("search", {}).get("edges", [])
     prs = [pr.get("node", {}).get("body") for pr in prs]
     return prs

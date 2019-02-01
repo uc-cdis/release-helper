@@ -41,5 +41,5 @@ More options are available for the `gen3git` CLI.
 gen3git --help
 ```
 
-You only need access token for private repos. This script should be able to read from
-public repos without the need to set the `GITHUB_ACCESS_TOKEN`.
+Because we uses GitHub v4 API, so you'll need to set the `GITHUB_ACCESS_TOKEN` even for
+public repositories.
