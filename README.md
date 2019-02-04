@@ -26,10 +26,16 @@ echo "export PATH=\"`python -m site --user-base`/bin:\$PATH\"" >> ~/.bash_profil
 
 (Or alternatively, you may use `sudo pip install` without `--user` and PATH trouble)
 
-Run the script from terminal (this example generates all supported outputs):
+Then you are ready to create auto-annotated tags:
 
+```bash
+gen3git tag 2.1.3
 ```
-gen3git fence 0.1.0 --html --markdown --text
+
+Or generate release notes into files (this example generates all supported outputs):
+
+```bash
+gen3git gen --html --markdown --text
 ```
 
 
@@ -41,5 +47,6 @@ More options are available for the `gen3git` CLI.
 gen3git --help
 ```
 
-Because we uses GitHub v4 API, so you'll need to set the `GITHUB_ACCESS_TOKEN` even for
-public repositories.
+You only need access token for private repos or workaround GitHub rate limit. This
+script should be able to read from public repos without the need to set the
+`GITHUB_ACCESS_TOKEN`.

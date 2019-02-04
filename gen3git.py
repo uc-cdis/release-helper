@@ -4,13 +4,19 @@ to create release notes.
 """
 
 import argparse
-import json
 import os
-from datetime import datetime
+import re
 
 import requests
+from datetime import datetime
 from enum import Enum
+from git import Repo
 from github import Github
+from pkg_resources import parse_version
+
+
+_GITHUB_REMOTE = re.compile(r"git@github.com:(.*).git|https://github.com/(.*).git")
+_GITHUB_PR = re.compile(r'href="[^"]+/pull/(\d+)"', re.DOTALL)
 
 
 class ReleaseNotes(object):
@@ -135,55 +141,59 @@ class ReleaseNotes(object):
 
 def get_command_line_args():
     parser = argparse.ArgumentParser(description="Create release notes")
+    subs = parser.add_subparsers()
+    gen = subs.add_parser("gen", help="Generate release notes only.")
     parser.add_argument(
-        "repo", type=str, help="Tag to start getting release notes from."
-    )
-    parser.add_argument(
-        "from_tag", type=str, help="Tag to start getting release notes from."
-    )
-    parser.add_argument(
-        "--to_tag",
+        "--repo",
         type=str,
-        default="latest",
-        help="Tag to stop collecting release notes at.",
+        help='GitHub repository identifier in format "name/repo", default to the '
+        "remote URL found in current local repository.",
     )
     parser.add_argument(
-        "--file_name",
+        "--from-tag",
+        type=str,
+        help="Tag to start getting release notes from, default is the greatest tag as "
+        "for versions.",
+    )
+    gen.add_argument(
+        "--to-tag",
+        type=str,
+        help="Tag to stop collecting release notes at, default is current git HEAD.",
+    )
+    gen.add_argument(
+        "--file-name",
         type=str,
         default="release_notes",
-        help="Name for file to export to. Don't include extention",
+        help="Name for file to export to. Don't include extention. Default is "
+        '"release_notes".',
     )
-    parser.add_argument(
+    gen.add_argument(
         "--text",
         action="store_const",
         const=True,
-        help="output a text file with release notes",
+        help="Output a text file with release notes.",
     )
-    parser.add_argument(
+    gen.add_argument(
         "--markdown",
         action="store_const",
         const=True,
-        help="output a markdown file with release notes",
+        help="Output a markdown file with release notes.",
     )
-    parser.add_argument(
+    gen.add_argument(
         "--html",
         action="store_const",
         const=True,
-        help="output an html file with release notes",
+        help="Output an html file with release notes.",
     )
     parser.add_argument(
-        "--org",
-        type=str,
-        default="uc-cdis",
-        help="Organization or person owning the specified repo",
-    )
-
-    parser.add_argument(
-        "--github_access_token",
+        "--github-access-token",
         type=str,
         default=os.environ.get("ACCESS_TOKEN"),
-        help="",
+        help="GitHub access token for accessing private repositories if any.",
     )
+
+    tag = subs.add_parser("tag", help="Create git tag with automatic annotation.")
+    tag.add_argument("new_tag", help="The new tag to create.")
 
     args = parser.parse_args()
     return args
@@ -197,114 +207,145 @@ def main(args=None):
     else:
         g = Github()
 
-    repo_path = args.org + "/" + args.repo
-    repo = g.get_repo(repo_path)
+    # Get GitHub Repository
+    git = Repo()
+    if args.repo:
+        uri = args.repo
+    else:
+        uri = list(git.remote(git.active_branch.tracking_branch().remote_name).urls)
+        if len(uri) == 1:
+            uri = uri[0]
+        else:
+            print("Multiple URL found, please manually specify.")
+            return
 
-    input_tag = args.from_tag
+        uri = u"".join(_GITHUB_REMOTE.findall(uri)[0])
+    repo = g.get_repo(uri)
+    print("GitHub Repository: %s" % repo.full_name)
 
-    if not input_tag:
-        print("You didn't enter a git tag, can't get release notes.")
-        exit()
-
-    tagged_commit_sha = get_commit_sha_from_tag(repo, input_tag)
-    if not tagged_commit_sha:
-        print(
-            "Tag {} doesn't exist in GitHub for repo: {}.".format(
-                input_tag, repo.full_name
-            )
-        )
-        exit()
-
-    tagged_commit = repo.get_commit(sha=tagged_commit_sha)
-    tagged_commit_date = tagged_commit.commit.committer.date.isoformat()
-
-    prs = get_pr_descriptions_since_date(
-        tagged_commit_date, repo_path, github_access_token=args.github_access_token
+    # Get commit to start collect changelogs from
+    if args.from_tag:
+        for tag in git.tags:
+            if args.from_tag in tag.name:
+                start_tag = tag
+                break
+        else:
+            print("Cannot find tag %s" % args.from_tag)
+            return
+    else:
+        start_tag = None
+        for tag in git.tags[1:]:
+            if not start_tag or parse_version(tag.name) > parse_version(start_tag.name):
+                start_tag = tag
+        if not start_tag:
+            print("There is no tag found in this repository, please manually specify.")
+            return
+    repo.get_commit(start_tag.commit.hexsha)
+    print(
+        "Generate changelog starting from: %s (%s)"
+        % (start_tag.name, start_tag.commit.hexsha)
     )
+
+    # Get commit to stop collect changelogs to
+    stop_tag = None
+    if hasattr(args, "to_tag"):
+        for tag in git.tags:
+            if args.to_tag in tag.name:
+                stop_tag = tag.name
+                stop_commit = tag.commit
+                break
+        else:
+            print("Cannot find tag", args.to_tag)
+            return
+    else:
+        stop_commit = git.head.commit
+        if hasattr(args, "new_tag"):
+            stop_tag = args.new_tag
+        else:
+            for tag in git.tags:
+                if tag.commit.hexsha == stop_commit.hexsha:
+                    stop_tag = tag.name
+    repo.get_commit(stop_commit.hexsha)
+    print("Generate changelog up to commit: %s" % stop_commit.hexsha)
+
+    # Get all PR descriptions (and commit message if no PR related)
+    all_prs = set()
+    desc_bodies = []
+    for commit in git.iter_commits(
+        "%s...%s" % (start_tag.commit.hexsha, stop_commit.hexsha)
+    ):
+        # https://platform.github.community/t/get-pull-request-associated-with-merge-commit/6936
+        # https://github.blog/2014-10-13-linking-merged-pull-requests-from-commits/
+        # We are not using the search API because its rate limit is too low
+        resp = requests.get(
+            "https://github.com/%s/branch_commits/%s" % (uri, commit.hexsha)
+        )
+        resp.raise_for_status()
+        prs = _GITHUB_PR.findall(resp.text)
+        if prs:
+            print("Commit %s: #%s" % (commit.hexsha, ", #".join(prs)))
+            for pr in prs:
+                pr = int(pr)
+                if pr not in all_prs:
+                    all_prs.add(pr)
+                    desc_bodies.append((pr, repo.get_pull(pr).body))
+        else:
+            print("Commit %s: no PR" % commit.hexsha)
+            desc_bodies.append((commit.hexsha[:6], commit.message))
 
     release_notes_raw = {"general updates": []}
-    for pr in prs:
-        release_notes_raw = parse_pr_body(pr, release_notes_raw)
+    for ref, pr in desc_bodies:
+        release_notes_raw = parse_pr_body(pr, release_notes_raw, ref)
 
     release_notes = ReleaseNotes(release_notes_raw)
-    additional_text = "For: {}\nNotes since tag: {}\nGenerated: {}\n".format(
-        repo.full_name, input_tag, datetime.now().date()
+    additional_text = """\
+For: {}
+Notes since tag: {}
+Notes to tag/commit: {}
+Generated: {}
+""".format(
+        repo.full_name,
+        start_tag.name,
+        stop_tag or stop_commit.hexsha,
+        datetime.now().date(),
     )
 
-    if args.markdown:
+    if getattr(args, "markdown", False):
         release_notes.export(
             type_=ReleaseNotes.ExportType.MARKDOWN,
             file=args.file_name + ".md",
             additional_text=additional_text,
         )
 
-    if args.html:
+    if getattr(args, "html", False):
         release_notes.export(
             type_=ReleaseNotes.ExportType.HTML,
             file=args.file_name + ".html",
             additional_text=additional_text,
         )
 
-    if args.text or not any([args.text, args.markdown, args.html]):
+    if getattr(args, "text", False) or not any(
+        [
+            getattr(args, "new_tag", None),
+            getattr(args, "markdown", False),
+            getattr(args, "html", False),
+        ]
+    ):
         release_notes.export(
             type_=ReleaseNotes.ExportType.TEXT,
             file=args.file_name + ".txt",
             additional_text=additional_text,
         )
 
-
-def get_pr_descriptions_since_date(
-    tagged_commit_date, repo_path, github_access_token=None
-):
-    get_pr_comments_query = """query {
-          search(first: 100, type: ISSUE, query: $QUERY) {
-            edges {
-              node {
-                ... on PullRequest {
-                  title
-                  body
-                }
-              }
-            }
-            pageInfo {
-              endCursor
-              hasNextPage
-            }
-          }
-        }"""
-    get_pr_comments_query = get_pr_comments_query.replace(
-        "$QUERY",
-        '"repo:{} state:closed type:pr created:>{}"'.format(
-            repo_path, tagged_commit_date
-        ),
-    )
-
-    if github_access_token:
-        headers = {"Authorization": "Bearer {}".format(github_access_token)}
-    else:
-        headers = {}
-
-    data = json.dumps({"query": str(get_pr_comments_query)})
-    response = requests.post(
-        "https://api.github.com/graphql", headers=headers, data=data
-    )
-    response.raise_for_status()
-    prs = response.json().get("data", {}).get("search", {}).get("edges", [])
-    prs = [pr.get("node", {}).get("body") for pr in prs]
-    return prs
+    if hasattr(args, "new_tag"):
+        annotation = release_notes.export(
+            type_=ReleaseNotes.ExportType.TEXT, additional_text=additional_text
+        )
+        tag = git.create_tag(args.new_tag, message=annotation)
+        print("Created tag %s at %s" % (tag.name, tag.commit.hexsha))
 
 
-def get_commit_sha_from_tag(repo, input_tag):
-    tags = repo.get_tags()
-    tagged_commit_sha = None
-    for tag in tags:
-        if tag.name == input_tag:
-            tagged_commit_sha = tag.commit.sha
-
-    return tagged_commit_sha
-
-
-def parse_pr_body(body, release_notes):
+def parse_pr_body(body, release_notes, ref):
     category = "general updates"
     for line in body.replace("\r", "").split("\n"):
         if line.startswith("###"):
@@ -314,7 +355,7 @@ def parse_pr_body(body, release_notes):
         elif line:
             line = parse_line(line)
             if line:
-                release_notes[category].append(line)
+                release_notes[category].append("%s (#%s)" % (line, ref))
         else:
             continue
 
