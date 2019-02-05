@@ -146,7 +146,7 @@ def get_command_line_args():
     parser.add_argument(
         "--repo",
         type=str,
-        help='GitHub repository identifier in format "name/repo", default to the '
+        help='GitHub repository identifier in format "owner/repo", default to the '
         "remote URL found in current local repository.",
     )
     parser.add_argument(
@@ -212,7 +212,12 @@ def main(args=None):
     if args.repo:
         uri = args.repo
     else:
-        uri = list(git.remote(git.active_branch.tracking_branch().remote_name).urls)
+        tracking_branch = git.active_branch.tracking_branch()
+        if not tracking_branch:
+            print("No remote URL found for current branch, please specify --repo "
+                  "manually.")
+            return
+        uri = list(git.remote(tracking_branch.remote_name).urls)
         if len(uri) == 1:
             uri = uri[0]
         else:
@@ -234,7 +239,7 @@ def main(args=None):
             return
     else:
         start_tag = None
-        for tag in git.tags[1:]:
+        for tag in git.tags:
             if not start_tag or parse_version(tag.name) > parse_version(start_tag.name):
                 start_tag = tag
         if not start_tag:
@@ -248,14 +253,14 @@ def main(args=None):
 
     # Get commit to stop collect changelogs to
     stop_tag = None
-    if hasattr(args, "to_tag"):
+    if getattr(args, "to_tag", None):
         for tag in git.tags:
             if args.to_tag in tag.name:
                 stop_tag = tag.name
                 stop_commit = tag.commit
                 break
         else:
-            print("Cannot find tag", args.to_tag)
+            print("Cannot find tag: %s" % args.to_tag)
             return
     else:
         stop_commit = git.head.commit
