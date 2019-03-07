@@ -1,0 +1,27 @@
+language: python
+dist: xenial
+python:
+- 2.7
+- 3.7
+install:
+- pip install pipenv
+- pipenv install --dev --deploy
+script: pipenv run python setup.py test
+before_deploy:
+- sed -i.bak "s/=get_version()/='$TRAVIS_TAG'/g" setup.py
+- cat setup.py
+- if [ $(python setup.py --version) == '0.0.0' ]; then travis_terminate 1; fi
+deploy:
+  provider: pypi
+  user: uc-ctds
+  skip_existing: true
+  skip_cleanup: true
+  on:
+    tags: true
+  password:
+    secure: MkZXTs53cyKwIC8DbN3u7UVzAM9ZxuICNWjvI8uWhsleFXpdCdkL4I4KhxixqOpZRhB1/arXbWlqfHn4P7D8unzg4WvI+r1x9BIibQj0BeZl2eITk71T1PRMVKD7QLDqOk6M3kfh78eBWfmFro0644rwQrI1D/GskO7y64XObAfqM4qpJmuBZB+NU24rNwRHH+EqAZmSkP29Syl13dPIQ90K03sse6fP8BTyz/dNJ43dnyQIHYDEhJD0+1QlAMRbE8RkV+ylbLdZC3H5H0FtoxlC+4YkFA7CAH9+ntGRMR7uhD+ZpJdXn9uFXK3olr8YKin/44p8Aj+IRhHUaSzUDt+NBXXdqREOIJUv4lwPWajO3xIs9R5Fo31uum2SCnMUM3i+fXxrFMZhrZaasFm5p5y2XqQD2dbjbYEZcKu1y2WmuSDUuWFEwjPabFKFoYqz8OYDkrOHCrqLc+g886Gb7x0UutMYVTA6ZZRkvBhPN/eE6/aHltun7J4diHSt7Q7sE0C57HDqF1g9yeYyYy5YIPWnD2nAeJXQNjZHZBlBGuuSQX5n5ekhkQ4p7cX6G/Gl+o25WQCmMkdzQ5q41o+lZAvEzsHDiuYrBWiG3KbVVvd/a89yVY2xlk6PG56ecfOmfcq+CnL6xffzIqWHivCCTkZOXqnOK9KVIQkmfF0ilxs=
+env:
+  global:
+  - secure: bpVy03OCUPBXTCtfQDana5mI23xte/n+TielotTGnPabgkswNHhuer1LgboWUFsTGM4Bk6qB2wvRqv7xmAT7hSUHPbMvahF33P+hybn30Qgqan1NkzKV0ua/qUMDdnwlR0+jhENDb1S5eCpCYmHqznPulTKcO1gRpT5fbylqahLjpArMCMYqOB1DTnL6qiJAy6PzLI4zVx3CWc1Ic3TVpyZuEjD0MWDUAp/w+sPt2ex7iaa+K2jUAP0lXplBlgryoavIXRRy8c9fKmNExk8wHaFEexpOwezIifgUjxV/vihMLFwtI9/oGayf/dSaq6hD2FbyQOtBWsSW642m4XvgTj3BCWDTBiOe2V9+CjbOXXYLLSsK1g1xxJkQX8ydlGzSa3Ekwp0jLnqfI6uSO8abXV3IoJPrGJGp+Iz4LjZugr8+HMeODTlgTFzh8qJKcQTCTV6yIpMZmGqcZos8CW8qGg0Y2M5fzYNPhRrc3xtMMto3D7IWoYUGsoidV+PQoqHBTfkxOvdVWJ8JmJAPg3ZAujmYlq8ztFmmNqtOKwgnXRSMM9VqgoFXQLRDuLr1fS4GX4CSc22vfR5A6ORzCJJYGXWGb+k4rO50VBxrYvGXTiynwvan1/2/Gy5ejIJEGBaig06HLw3deHhCIIpjjNCvGlXmrgURc+fts8zfuPxkSBQ=
+after_deploy:
+- gen3git release
