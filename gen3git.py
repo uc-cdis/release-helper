@@ -219,7 +219,7 @@ def main(args=None):
         g = Github()
 
     # Get GitHub Repository
-    git = Repo()
+    git = Repo(search_parent_directories=True)
     if args.repo:
         uri = args.repo
     else:
