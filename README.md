@@ -38,6 +38,20 @@ Or generate release notes into files (this example generates all supported outpu
 gen3git gen --html --markdown --text
 ```
 
+It also works as a Travis after-deploy hook to update release notes into the GitHub
+release that triggered the deploy:
+
+```yaml
+deploy:
+  on:
+    tags: true
+env:
+  global:
+    secure: encrypted GH_TOKEN=YOUR_PERSONAL_ACCESS_TOKEN here
+after_deploy:
+- gen3git release
+```
+
 
 ## Details
 

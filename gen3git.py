@@ -14,7 +14,6 @@ from git import Repo
 from github import Github
 from pkg_resources import parse_version
 
-
 _GITHUB_REMOTE = re.compile(r"git@github.com:(.*).git|https://github.com/(.*).git")
 _GITHUB_PR = re.compile(r'href="[^"]+/pull/(\d+)"', re.DOTALL)
 
@@ -146,19 +145,22 @@ def get_command_line_args():
     parser.add_argument(
         "--repo",
         type=str,
-        help='GitHub repository identifier in format "owner/repo", default to the '
-        "remote URL found in current local repository.",
+        help='GitHub repository identifier in format "owner/repo", default to '
+        "$TRAVIS_REPO_SLUG if set, or the remote URL found in current local "
+        "repository.",
+        default=os.getenv("TRAVIS_REPO_SLUG"),
     )
     parser.add_argument(
         "--from-tag",
         type=str,
-        help="Tag to start getting release notes from, default is the greatest tag as "
-        "for versions.",
+        help="Tag to start getting release notes from. Default is the greatest tag as "
+        "for versions, less than $TRAVIS_TAG if present.",
     )
     gen.add_argument(
         "--to-tag",
         type=str,
-        help="Tag to stop collecting release notes at, default is current git HEAD.",
+        help="Tag to stop collecting release notes at, default is $TRAVIS_TAG if set, "
+        "or current git HEAD.",
     )
     gen.add_argument(
         "--file-name",
@@ -195,6 +197,15 @@ def get_command_line_args():
     tag = subs.add_parser("tag", help="Create git tag with automatic annotation.")
     tag.add_argument("new_tag", help="The new tag to create.")
 
+    release = subs.add_parser("release", help="Update GitHub release with notes.")
+    release.add_argument(
+        "--release-tag",
+        type=str,
+        help="Tag to stop collecting release notes at and to update notes to, default "
+        "is TRAVIS_TAG.",
+        default=os.getenv("TRAVIS_TAG"),
+    )
+
     args = parser.parse_args()
     return args
 
@@ -214,8 +225,10 @@ def main(args=None):
     else:
         tracking_branch = git.active_branch.tracking_branch()
         if not tracking_branch:
-            print("No remote URL found for current branch, please specify --repo "
-                  "manually.")
+            print(
+                "No remote URL found for current branch, please specify --repo "
+                "manually."
+            )
             return
         uri = list(git.remote(tracking_branch.remote_name).urls)
         if len(uri) == 1:
@@ -225,42 +238,22 @@ def main(args=None):
             return
 
         uri = u"".join(_GITHUB_REMOTE.findall(uri)[0])
+
     repo = g.get_repo(uri)
     print("GitHub Repository: %s" % repo.full_name)
 
-    # Get commit to start collect changelogs from
-    if args.from_tag:
-        for tag in git.tags:
-            if args.from_tag in tag.name:
-                start_tag = tag
-                break
-        else:
-            print("Cannot find tag %s" % args.from_tag)
-            return
-    else:
-        start_tag = None
-        for tag in git.tags:
-            if not start_tag or parse_version(tag.name) > parse_version(start_tag.name):
-                start_tag = tag
-        if not start_tag:
-            print("There is no tag found in this repository, please manually specify.")
-            return
-    repo.get_commit(start_tag.commit.hexsha)
-    print(
-        "Generate changelog starting from: %s (%s)"
-        % (start_tag.name, start_tag.commit.hexsha)
-    )
-
     # Get commit to stop collect changelogs to
     stop_tag = None
-    if getattr(args, "to_tag", None):
+    release_tag = getattr(args, "release_tag", None)
+    to_tag = getattr(args, "to_tag", None) or release_tag
+    if to_tag:
         for tag in git.tags:
-            if args.to_tag in tag.name:
+            if to_tag in tag.name:
                 stop_tag = tag.name
                 stop_commit = tag.commit
                 break
         else:
-            print("Cannot find tag: %s" % args.to_tag)
+            print("Cannot find tag: %s" % to_tag)
             return
     else:
         stop_commit = git.head.commit
@@ -272,6 +265,35 @@ def main(args=None):
                     stop_tag = tag.name
     repo.get_commit(stop_commit.hexsha)
     print("Generate changelog up to commit: %s" % stop_commit.hexsha)
+
+    # Get commit to start collect changelogs from
+    if args.from_tag:
+        for tag in git.tags:
+            if args.from_tag in tag.name:
+                start_tag = tag
+                break
+        else:
+            print("Cannot find tag %s" % args.from_tag)
+            return
+    else:
+        upper_bound = parse_version(stop_tag) if stop_tag else None
+        start_tag = None
+        for tag in git.tags:
+            ver = parse_version(tag.name)
+            if (
+                not start_tag
+                or ver > parse_version(start_tag.name)
+                and (not upper_bound or ver < upper_bound)
+            ):
+                start_tag = tag
+        if not start_tag:
+            print("There is no tag found in this repository, please manually specify.")
+            return
+    repo.get_commit(start_tag.commit.hexsha)
+    print(
+        "Generate changelog starting from: %s (%s)"
+        % (start_tag.name, start_tag.commit.hexsha)
+    )
 
     # Get all PR descriptions (and commit message if no PR related)
     all_prs = set()
@@ -315,12 +337,21 @@ Generated: {}
         datetime.now().date(),
     )
 
-    if getattr(args, "markdown", False):
-        release_notes.export(
+    if getattr(args, "markdown", release_tag):
+        markdown = release_notes.export(
             type_=ReleaseNotes.ExportType.MARKDOWN,
-            file=args.file_name + ".md",
+            file=(args.file_name + ".md") if hasattr(args, "file_name") else None,
             additional_text=additional_text,
         )
+        if release_tag:
+            try:
+                release = repo.get_release(release_tag)
+            except Exception:
+                pass
+            else:
+                release.update_release(
+                    release.title, markdown, release.draft, release.prerelease
+                )
 
     if getattr(args, "html", False):
         release_notes.export(
@@ -332,6 +363,7 @@ Generated: {}
     if getattr(args, "text", False) or not any(
         [
             getattr(args, "new_tag", None),
+            hasattr(args, "release_tag"),
             getattr(args, "markdown", False),
             getattr(args, "html", False),
         ]
