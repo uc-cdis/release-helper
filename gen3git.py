@@ -122,7 +122,10 @@ class ReleaseNotes(object):
             total_length = 0
 
             # given a list of words, keep trying to add another word without going over
-            # 76 chars
+            # 76 chars. if a single word is longer than 76 chars, add it anyway
+            if len(words[0]) >= 76:
+                output += words[0]
+                del words[0]
             while words and ((total_length + len(words[0])) < 76):
                 total_length += len(words[0]) + 1  # 1 for space
                 output += words[0] + " "
