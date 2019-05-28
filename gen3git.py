@@ -115,21 +115,23 @@ class ReleaseNotes(object):
           - this is a long line that we should probably break up into much smaller
             pieces so that's what this does. cool.
         """
+        break_value = 76
         output = line
-        if len(line) > 76:
+        if len(line) > break_value:
             output = ""
             words = line.split()
             total_length = 0
 
             # given a list of words, keep trying to add another word without going over
             # 76 chars. if a single word is longer than 76 chars, add it anyway
-            if len(words[0]) >= 76:
+            if len(words[0]) >= break_value:
                 output += words[0]
                 del words[0]
-            while words and ((total_length + len(words[0])) < 76):
-                total_length += len(words[0]) + 1  # 1 for space
-                output += words[0] + " "
-                del words[0]
+            else:
+                while words and ((total_length + len(words[0])) < break_value):
+                    total_length += len(words[0]) + 1  # 1 for space
+                    output += words[0] + " "
+                    del words[0]
 
             # hit 76 char limit or used all the words, new line
             output += "\n    "
