@@ -389,17 +389,18 @@ Generated: {}
 
 def parse_pr_body(body, release_notes, ref):
     category = "general updates"
-    for line in body.replace("\r", "").split("\n"):
-        if line.startswith("###"):
-            category = line.replace("###", "").strip().lower()
-            if category not in release_notes:
-                release_notes[category] = []
-        elif line:
-            line = parse_line(line)
-            if line:
-                release_notes[category].append("%s (#%s)" % (line, ref))
-        else:
-            continue
+    if body:
+        for line in body.splitlines():
+            if line.startswith("###"):
+                category = line.replace("###", "").strip().lower()
+                if category not in release_notes:
+                    release_notes[category] = []
+            elif line:
+                line = parse_line(line)
+                if line:
+                    release_notes[category].append("%s (#%s)" % (line, ref))
+            else:
+                continue
 
     return release_notes
 
