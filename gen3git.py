@@ -171,7 +171,7 @@ def get_command_line_args():
         "--file-name",
         type=str,
         default="release_notes",
-        help="Name for file to export to. Don't include extention. Default is "
+        help="Name for file to export to. Don't include extension. Default is "
         '"release_notes".',
     )
     gen.add_argument(
@@ -390,6 +390,15 @@ Generated: {}
 def parse_pr_body(body, release_notes, ref):
     category = "general updates"
     if body:
+
+        # handle dependabot PRs
+        if "Dependabot commands and options" in body:
+            category = "Dependency Updates"
+            for line in body.splitlines():
+                if line.startswith("Bumps"):
+                    release_notes.setdefault(category, []).append("%s (#%s)" % (line, ref))
+            return release_notes
+
         for line in body.splitlines():
             if line.startswith("###"):
                 category = line.replace("###", "").strip().lower()
