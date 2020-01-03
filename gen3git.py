@@ -261,7 +261,7 @@ def main(args=None):
             print("Cannot find tag: %s" % to_tag)
             return
     else:
-        stop_commit = repo.get_commits().__getitem__(0)  # latest commit
+        stop_commit = repo.get_commits()[0]  # latest commit
         if hasattr(args, "new_tag"):
             stop_tag = args.new_tag
         else:
