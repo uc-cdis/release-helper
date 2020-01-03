@@ -252,7 +252,7 @@ def main(args=None):
     release_tag = getattr(args, "release_tag", None)
     to_tag = getattr(args, "to_tag", None) or release_tag
     if to_tag:
-        for tag in git.tags:
+        for tag in repo.get_tags():
             if to_tag in tag.name:
                 stop_tag = tag.name
                 stop_commit = tag.commit
@@ -261,19 +261,19 @@ def main(args=None):
             print("Cannot find tag: %s" % to_tag)
             return
     else:
-        stop_commit = git.head.commit
+        stop_commit = repo.get_commits()[0]  # latest commit
         if hasattr(args, "new_tag"):
             stop_tag = args.new_tag
         else:
-            for tag in git.tags:
-                if tag.commit.hexsha == stop_commit.hexsha:
+            for tag in repo.get_tags():
+                if tag.commit.sha == stop_commit.sha:
                     stop_tag = tag.name
-    repo.get_commit(stop_commit.hexsha)
-    print("Generate changelog up to commit: %s" % stop_commit.hexsha)
+    repo.get_commit(stop_commit.sha)
+    print("Generate changelog up to commit: %s" % stop_commit.sha)
 
     # Get commit to start collect changelogs from
     if args.from_tag:
-        for tag in git.tags:
+        for tag in repo.get_tags():
             if args.from_tag in tag.name:
                 start_tag = tag
                 break
@@ -283,7 +283,7 @@ def main(args=None):
     else:
         upper_bound = parse_version(stop_tag) if stop_tag else None
         start_tag = None
-        for tag in git.tags:
+        for tag in repo.get_tags():
             ver = parse_version(tag.name)
             if (
                 not start_tag
@@ -294,36 +294,36 @@ def main(args=None):
         if not start_tag:
             print("There is no tag found in this repository, please manually specify.")
             return
-    repo.get_commit(start_tag.commit.hexsha)
+    repo.get_commit(start_tag.commit.sha)
     print(
         "Generate changelog starting from: %s (%s)"
-        % (start_tag.name, start_tag.commit.hexsha)
+        % (start_tag.name, start_tag.commit.sha)
     )
 
     # Get all PR descriptions (and commit message if no PR related)
     all_prs = set()
     desc_bodies = []
-    for commit in git.iter_commits(
-        "%s...%s" % (start_tag.commit.hexsha, stop_commit.hexsha)
-    ):
+    start_date = start_tag.commit.commit.author.date
+    stop_date = stop_commit.commit.author.date
+    for commit in repo.get_commits(since=start_date, until=stop_date):
         # https://platform.github.community/t/get-pull-request-associated-with-merge-commit/6936
         # https://github.blog/2014-10-13-linking-merged-pull-requests-from-commits/
         # We are not using the search API because its rate limit is too low
         resp = requests.get(
-            "https://github.com/%s/branch_commits/%s" % (uri, commit.hexsha)
+            "https://github.com/%s/branch_commits/%s" % (uri, commit.sha)
         )
         resp.raise_for_status()
         prs = _GITHUB_PR.findall(resp.text)
         if prs:
-            print("Commit %s: #%s" % (commit.hexsha, ", #".join(prs)))
+            print("Commit %s: #%s" % (commit.sha, ", #".join(prs)))
             for pr in prs:
                 pr = int(pr)
                 if pr not in all_prs:
                     all_prs.add(pr)
                     desc_bodies.append((pr, repo.get_pull(pr).body))
         else:
-            print("Commit %s: no PR" % commit.hexsha)
-            desc_bodies.append((commit.hexsha[:6], commit.message))
+            print("Commit %s: no PR" % commit.sha)
+            desc_bodies.append((commit.sha[:6], commit.commit.message))
 
     release_notes_raw = {"general updates": []}
     for ref, pr in desc_bodies:
@@ -338,53 +338,59 @@ Generated: {}
 """.format(
         repo.full_name,
         start_tag.name,
-        stop_tag or stop_commit.hexsha,
+        stop_tag or stop_commit.sha,
         datetime.now().date(),
     )
 
-    if getattr(args, "markdown", release_tag):
-        markdown = release_notes.export(
-            type_=ReleaseNotes.ExportType.MARKDOWN,
-            file=(args.file_name + ".md") if hasattr(args, "file_name") else None,
-            additional_text=additional_text,
-        )
-        if release_tag:
-            try:
-                release = repo.get_release(release_tag)
-            except Exception:
-                pass
-            else:
-                release.update_release(
-                    release.title, markdown, release.draft, release.prerelease
-                )
+    # if using the CLI, there is a default file_name. if not, it's optional
+    if not hasattr(args, "file_name") or not args.file_name:
+        print("Argument file_name not specified: not saving to file")
+    else:
+        if getattr(args, "markdown", release_tag):
+            markdown = release_notes.export(
+                type_=ReleaseNotes.ExportType.MARKDOWN,
+                file=(args.file_name + ".md") if hasattr(args, "file_name") else None,
+                additional_text=additional_text,
+            )
+            if release_tag:
+                try:
+                    release = repo.get_release(release_tag)
+                except Exception:
+                    pass
+                else:
+                    release.update_release(
+                        release.title, markdown, release.draft, release.prerelease
+                    )
 
-    if getattr(args, "html", False):
-        release_notes.export(
-            type_=ReleaseNotes.ExportType.HTML,
-            file=args.file_name + ".html",
-            additional_text=additional_text,
-        )
+        if getattr(args, "html", False):
+            release_notes.export(
+                type_=ReleaseNotes.ExportType.HTML,
+                file=args.file_name + ".html",
+                additional_text=additional_text,
+            )
 
-    if getattr(args, "text", False) or not any(
-        [
-            getattr(args, "new_tag", None),
-            hasattr(args, "release_tag"),
-            getattr(args, "markdown", False),
-            getattr(args, "html", False),
-        ]
-    ):
-        release_notes.export(
-            type_=ReleaseNotes.ExportType.TEXT,
-            file=args.file_name + ".txt",
-            additional_text=additional_text,
-        )
+        if getattr(args, "text", False) or not any(
+            [
+                getattr(args, "new_tag", None),
+                hasattr(args, "release_tag"),
+                getattr(args, "markdown", False),
+                getattr(args, "html", False),
+            ]
+        ):
+            release_notes.export(
+                type_=ReleaseNotes.ExportType.TEXT,
+                file=args.file_name + ".txt",
+                additional_text=additional_text,
+            )
 
     if hasattr(args, "new_tag"):
         annotation = release_notes.export(
             type_=ReleaseNotes.ExportType.TEXT, additional_text=additional_text
         )
-        tag = git.create_tag(args.new_tag, message=annotation)
-        print("Created tag %s at %s" % (tag.name, tag.commit.hexsha))
+        repo.create_git_ref("refs/tags/" + args.new_tag, stop_commit.sha)
+        print("Created tag %s at %s" % (new_tag, stop_commit.sha))
+
+    return release_notes.release_notes
 
 
 def parse_pr_body(body, release_notes, ref):
