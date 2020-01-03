@@ -386,7 +386,8 @@ Generated: {}
         repo.create_git_ref("refs/tags/" + args.new_tag, stop_commit.sha)
         print("Created tag %s at %s" % (new_tag, stop_commit.sha))
 
-    return release_notes.release_notes
+    if not hasattr(args, "file_name"):
+        return release_notes.release_notes
 
 
 def parse_pr_body(body, release_notes, ref):
@@ -398,7 +399,9 @@ def parse_pr_body(body, release_notes, ref):
             category = "Dependency Updates"
             for line in body.splitlines():
                 if line.startswith("Bumps"):
-                    release_notes.setdefault(category, []).append("%s (#%s)" % (line, ref))
+                    release_notes.setdefault(category, []).append(
+                        "%s (#%s)" % (line, ref)
+                    )
             return release_notes
 
         for line in body.splitlines():
