@@ -342,46 +342,42 @@ Generated: {}
         datetime.now().date(),
     )
 
-    # if using the CLI, there is a default file_name. if not, it's optional
-    if not hasattr(args, "file_name") or not args.file_name:
-        print("Argument file_name not specified: not saving to file")
-    else:
-        if getattr(args, "markdown", release_tag):
-            markdown = release_notes.export(
-                type_=ReleaseNotes.ExportType.MARKDOWN,
-                file=(args.file_name + ".md") if hasattr(args, "file_name") else None,
-                additional_text=additional_text,
-            )
-            if release_tag:
-                try:
-                    release = repo.get_release(release_tag)
-                except Exception:
-                    pass
-                else:
-                    release.update_release(
-                        release.title, markdown, release.draft, release.prerelease
-                    )
+    if getattr(args, "markdown", release_tag):
+        markdown = release_notes.export(
+            type_=ReleaseNotes.ExportType.MARKDOWN,
+            file=(args.file_name + ".md") if hasattr(args, "file_name") else None,
+            additional_text=additional_text,
+        )
+        if release_tag:
+            try:
+                release = repo.get_release(release_tag)
+            except Exception:
+                pass
+            else:
+                release.update_release(
+                    release.title, markdown, release.draft, release.prerelease
+                )
 
-        if getattr(args, "html", False):
-            release_notes.export(
-                type_=ReleaseNotes.ExportType.HTML,
-                file=args.file_name + ".html",
-                additional_text=additional_text,
-            )
+    if getattr(args, "html", False):
+        release_notes.export(
+            type_=ReleaseNotes.ExportType.HTML,
+            file=(args.file_name + ".html") if hasattr(args, "file_name") else None,
+            additional_text=additional_text,
+        )
 
-        if getattr(args, "text", False) or not any(
-            [
-                getattr(args, "new_tag", None),
-                hasattr(args, "release_tag"),
-                getattr(args, "markdown", False),
-                getattr(args, "html", False),
-            ]
-        ):
-            release_notes.export(
-                type_=ReleaseNotes.ExportType.TEXT,
-                file=args.file_name + ".txt",
-                additional_text=additional_text,
-            )
+    if getattr(args, "text", False) or not any(
+        [
+            getattr(args, "new_tag", None),
+            hasattr(args, "release_tag"),
+            getattr(args, "markdown", False),
+            getattr(args, "html", False),
+        ]
+    ):
+        release_notes.export(
+            type_=ReleaseNotes.ExportType.TEXT,
+            file=(args.file_name + ".txt") if hasattr(args, "file_name") else None,
+            additional_text=additional_text,
+        )
 
     if hasattr(args, "new_tag"):
         annotation = release_notes.export(
