@@ -8,7 +8,7 @@ import os
 import re
 
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from git import Repo
 from github import Github
@@ -158,13 +158,13 @@ def get_command_line_args():
     parser.add_argument(
         "--from-tag",
         type=str,
-        help="Tag to start getting release notes from. Default is the greatest tag as "
+        help="Tag to start getting release notes from (exclusive). Default is the greatest tag as "
         "for versions, less than $TRAVIS_TAG if present.",
     )
     gen.add_argument(
         "--to-tag",
         type=str,
-        help="Tag to stop collecting release notes at, default is $TRAVIS_TAG if set, "
+        help="Tag to stop collecting release notes at (inclusive), default is $TRAVIS_TAG if set, "
         "or current git HEAD.",
     )
     gen.add_argument(
@@ -247,7 +247,7 @@ def main(args=None):
     repo = g.get_repo(uri)
     print("GitHub Repository: %s" % repo.full_name)
 
-    # Get commit to stop collect changelogs to
+    # Get commit to stop collect changelogs to (inclusive)
     stop_tag = None
     release_tag = getattr(args, "release_tag", None)
     to_tag = getattr(args, "to_tag", None) or release_tag
@@ -271,7 +271,7 @@ def main(args=None):
     repo.get_commit(stop_commit.sha)
     print("Generate changelog up to commit: %s" % stop_commit.sha)
 
-    # Get commit to start collect changelogs from
+    # Get commit to start collect changelogs from (exclusive)
     if args.from_tag:
         for tag in repo.get_tags():
             if args.from_tag in tag.name:
@@ -303,7 +303,9 @@ def main(args=None):
     # Get all PR descriptions (and commit message if no PR related)
     all_prs = set()
     desc_bodies = []
-    start_date = start_tag.commit.commit.author.date
+    # add 1 second to the start date because the start commit should
+    # be excluded from the result:
+    start_date = start_tag.commit.commit.author.date + timedelta(0, 1)
     stop_date = stop_commit.commit.author.date
     for commit in repo.get_commits(since=start_date, until=stop_date):
         # https://platform.github.community/t/get-pull-request-associated-with-merge-commit/6936
