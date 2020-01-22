@@ -306,7 +306,9 @@ def main(args=None):
     # add 1 second to the start date because the start commit should
     # be excluded from the result:
     start_date = start_tag.commit.commit.author.date + timedelta(0, 1)
-    stop_date = stop_commit.commit.author.date
+    # add 5 seconds to the stop date because the PR's "merged_at" date may
+    # be a few seconds after the merged commit is created in master:
+    stop_date = stop_commit.commit.author.date + timedelta(0, 5)
     for commit in repo.get_commits(since=start_date, until=stop_date):
         # https://platform.github.community/t/get-pull-request-associated-with-merge-commit/6936
         # https://github.blog/2014-10-13-linking-merged-pull-requests-from-commits/
@@ -322,7 +324,12 @@ def main(args=None):
                 pr = int(pr)
                 if pr not in all_prs:
                     all_prs.add(pr)
-                    desc_bodies.append((pr, repo.get_pull(pr).body))
+                    repo_pr = repo.get_pull(pr)
+                    # only parse the PR description if it was merged after the
+                    # stop date. (ignore commits that were pushed before the
+                    # stop date if their PR was merged after)
+                    if repo_pr.merged_at <= stop_date:
+                        desc_bodies.append((pr, repo_pr.body))
         else:
             print("Commit %s: no PR" % commit.sha)
             desc_bodies.append((commit.sha[:6], commit.commit.message))
