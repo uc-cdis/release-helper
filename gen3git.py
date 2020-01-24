@@ -393,7 +393,7 @@ Generated: {}
             type_=ReleaseNotes.ExportType.TEXT, additional_text=additional_text
         )
         repo.create_git_ref("refs/tags/" + args.new_tag, stop_commit.sha)
-        print("Created tag %s at %s" % (new_tag, stop_commit.sha))
+        print("Created tag %s at %s" % (args.new_tag, stop_commit.sha))
 
     if not hasattr(args, "file_name"):
         return release_notes.release_notes
