@@ -167,6 +167,17 @@ def get_command_line_args():
         help="Tag to stop collecting release notes at (inclusive), default is $TRAVIS_TAG if set, "
         "or current git HEAD.",
     )
+    parser.add_argument(
+        "--from-date",
+        type=str,
+        help="Date to start getting release notes from (inclusive), format - YYYY-MM-DD. Overrides --from-tag argument. If not specified, falls back to default --from-tag.",
+    )
+    gen.add_argument(
+        "--to-date",
+        type=str,
+        help="Date to stop collecting release notes at (inclusive), format - YYYY-MM-DD, "
+             "Overrides --to-tag argument. If not specified, falls back to default --to-tag.",
+    )
     gen.add_argument(
         "--file-name",
         type=str,
@@ -309,6 +320,13 @@ def main(args=None):
     # add 5 seconds to the stop date because the PR's "merged_at" date may
     # be a few seconds after the merged commit is created in master:
     stop_date = stop_commit.commit.author.date + timedelta(0, 5)
+
+    # If dates are specified by the user, they override dates from tags/commits
+    if args.from_date:
+        start_date = datetime.strptime(args.from_date, "%Y-%m-%d")
+    if args.to_date:
+        stop_date = datetime.strptime(args.to_date, "%Y-%m-%d")
+
     for commit in repo.get_commits(since=start_date, until=stop_date):
         # https://platform.github.community/t/get-pull-request-associated-with-merge-commit/6936
         # https://github.blog/2014-10-13-linking-merged-pull-requests-from-commits/
