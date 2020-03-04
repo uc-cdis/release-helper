@@ -321,7 +321,7 @@ def main(args=None):
     # be a few seconds after the merged commit is created in master:
     stop_date = stop_commit.commit.author.date + timedelta(0, 5)
 
-    # Modifying for gen3release support to generate release notes based on the dates
+    # If dates are specified by the user, they override dates from tags/commits
     from_date = getattr(args, "from_date", None)
     if from_date:
         start_date = datetime.strptime(from_date, "%Y-%m-%d")
