@@ -176,7 +176,7 @@ def get_command_line_args():
         "--to-date",
         type=str,
         help="Date to stop collecting release notes at (inclusive), format - YYYY-MM-DD, "
-             "default is $TRAVIS_TAG if set, or current git HEAD.",
+             "Overrides --to-tag argument. If not specified, falls back to default --to-tag.",
     )
     gen.add_argument(
         "--file-name",
