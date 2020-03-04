@@ -99,7 +99,7 @@ class ReleaseNotes(object):
             # ignore items placed in the general description and just get following
             # sections. Don't include section if empty
             if key != "general updates" and values:
-                output += "#### " + key.title() + "\n"
+                output += "### " + key.title() + "\n"
                 for value in values:
                     output += "  - "
                     output += ReleaseNotes._breakup_line(value)
