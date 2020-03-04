@@ -170,13 +170,13 @@ def get_command_line_args():
     parser.add_argument(
         "--from-date",
         type=str,
-        help="Date to start getting release notes from (inclusive), format - YYYY-MM-DD.",
+        help="Date to start getting release notes from (inclusive), format - YYYY-MM-DD. Overrides --from-tag argument. If not specified, falls back to default --from-tag.",
     )
     gen.add_argument(
         "--to-date",
         type=str,
         help="Date to stop collecting release notes at (inclusive), format - YYYY-MM-DD, "
-             "default is $TRAVIS_TAG if set, or current git HEAD.",
+             "Overrides --to-tag argument. If not specified, falls back to default --to-tag.",
     )
     gen.add_argument(
         "--file-name",
@@ -321,13 +321,11 @@ def main(args=None):
     # be a few seconds after the merged commit is created in master:
     stop_date = stop_commit.commit.author.date + timedelta(0, 5)
 
-    # Modifying for gen3release support to generate release notes based on the dates
-    from_date = getattr(args, "from_date", None)
-    if from_date:
-        start_date = datetime.strptime(from_date, "%Y-%m-%d")
-    to_date = getattr(args, "to_date", None)
-    if to_date:
-        stop_date = datetime.strptime(to_date, "%Y-%m-%d")
+    # If dates are specified by the user, they override dates from tags/commits
+    if args.from_date:
+        start_date = datetime.strptime(args.from_date, "%Y-%m-%d")
+    if args.to_date:
+        stop_date = datetime.strptime(args.to_date, "%Y-%m-%d")
 
     for commit in repo.get_commits(since=start_date, until=stop_date):
         # https://platform.github.community/t/get-pull-request-associated-with-merge-commit/6936
