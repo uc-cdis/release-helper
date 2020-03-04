@@ -359,7 +359,6 @@ def main(args=None):
         release_notes_raw = parse_pr_body(pr, release_notes_raw, ref)
 
     release_notes = ReleaseNotes(release_notes_raw)
-
     additional_text = """\
 For: {}
 Notes since tag: {}
