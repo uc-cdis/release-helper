@@ -361,11 +361,11 @@ def main(args=None):
     release_notes = ReleaseNotes(release_notes_raw)
 
     additional_text = """\
-    For: {}
-    Notes since tag: {}
-    Notes to tag/commit: {}
-    Generated: {}
-    """.format(
+For: {}
+Notes since tag: {}
+Notes to tag/commit: {}
+Generated: {}
+""".format(
         repo.full_name,
         start_tag.name,
         stop_tag or stop_commit.sha,
