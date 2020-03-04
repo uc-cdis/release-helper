@@ -170,7 +170,7 @@ def get_command_line_args():
     parser.add_argument(
         "--from-date",
         type=str,
-        help="Date to start getting release notes from (inclusive), format - YYYY-MM-DD.",
+        help="Date to start getting release notes from (inclusive), format - YYYY-MM-DD. Overrides --from-tag argument. If not specified, falls back to default --from-tag.",
     )
     gen.add_argument(
         "--to-date",
