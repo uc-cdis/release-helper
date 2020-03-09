@@ -103,13 +103,13 @@ class ReleaseNotes(object):
     def _get_markdown_output(self, title_text, additional_text):
         output = ""
 
-        output += "# {}\n\n".format(title_text)
+        # output += "# {}\n\n".format(title_text)
         output += additional_text.replace("\n", "\n\n") + "\n\n"
         for key, values in self.release_notes.items():
             # ignore items placed in the general description and just get following
             # sections. Don't include section if empty
             if key != "general updates" and values:
-                output += "## " + key.title() + "\n"
+                output += "#### " + key.title() + "\n"
                 for value in values:
                     output += "  - "
                     output += ReleaseNotes._breakup_line(value)
@@ -196,7 +196,7 @@ def get_command_line_args():
     parser.add_argument(
         "--from-date",
         type=str,
-        help="Date to start getting release notes from (inclusive), format - YYYY-MM-DD. Overrides --from-tag argument. If not specified, falls back to default --from-tag.",
+        help="Date to start getting release notes from (inclusive), format - YYYY-MM-DD.",
     )
     gen.add_argument(
         "--to-date",
@@ -463,17 +463,9 @@ def main(args=None):
         )
 
     release_notes = ReleaseNotes(release_notes_raw)
-    additional_text = """\
-For: {}
-Notes since tag: {}
-Notes to tag/commit: {}
-Generated: {}
-""".format(
-        repo.full_name,
-        start_tag.name,
-        stop_tag or stop_commit.sha,
-        datetime.now().date(),
-    )
+
+    # Modifying format for gen3release Release Notes
+    additional_text = "## {}".format(repo.full_name)
 
     if output_type == "markdown":
         markdown = release_notes.export(
