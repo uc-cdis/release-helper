@@ -322,9 +322,9 @@ def main(args=None):
     stop_date = stop_commit.commit.author.date + timedelta(0, 5)
 
     # If dates are specified by the user, they override dates from tags/commits
-    if hasattr(args, 'from_date'):
+    if hasattr(args, 'from_date') and args.from_date is not None:
         start_date = datetime.strptime(args.from_date, "%Y-%m-%d")
-    if hasattr(args, 'to_date'):
+    if hasattr(args, 'to_date') and args.to_date is not None::
         stop_date = datetime.strptime(args.to_date, "%Y-%m-%d")
 
     for commit in repo.get_commits(since=start_date, until=stop_date):
