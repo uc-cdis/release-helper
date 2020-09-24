@@ -253,7 +253,11 @@ def main(args=None):
             print("Multiple URL found, please manually specify.")
             return
 
-        uri = u"".join(_GITHUB_REMOTE.findall(uri)[0])
+        matches = _GITHUB_REMOTE.findall(uri)
+        if not matches:
+            print(f"Unable to match remote uri {uri} to regex `{_GITHUB_REMOTE}`")
+            return
+        uri = "".join(matches[0])
 
     repo = g.get_repo(uri)
     print("GitHub Repository: %s" % repo.full_name)
