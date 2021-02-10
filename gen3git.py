@@ -255,7 +255,7 @@ def main(args=None):
 
         matches = _GITHUB_REMOTE.findall(uri)
         if not matches:
-            print(f"Unable to match remote uri {uri} to regex \`{_GITHUB_REMOTE}\`")
+            print(f"Unable to match remote uri {uri} to regex {_GITHUB_REMOTE}")
             return
         uri = "".join(matches[0])
 
