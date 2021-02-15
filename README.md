@@ -63,4 +63,4 @@ gen3git --help
 
 You only need access token for private repos or workaround GitHub rate limit. This
 script should be able to read from public repos without the need to set the
-`GITHUB_ACCESS_TOKEN`.
+`GH_TOKEN`.
