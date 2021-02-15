@@ -234,6 +234,12 @@ def main(args=None):
     else:
         g = Github()
 
+    headers = {}
+    if args.github_access_token:
+        headers = {"Authorization", f"token {args.github_access_token}"}
+    else:
+        print("No GitHub access token provided. Will fail to access private repos.")
+
     # Get GitHub Repository
     git = Repo(search_parent_directories=True)
     if args.repo:
@@ -336,7 +342,8 @@ def main(args=None):
         # https://github.blog/2014-10-13-linking-merged-pull-requests-from-commits/
         # We are not using the search API because its rate limit is too low
         resp = requests.get(
-            "https://github.com/%s/branch_commits/%s" % (uri, commit.sha)
+            "https://github.com/%s/branch_commits/%s" % (uri, commit.sha),
+            headers=headers,
         )
         resp.raise_for_status()
         prs = _GITHUB_PR.findall(resp.text)
