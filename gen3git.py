@@ -236,7 +236,7 @@ def main(args=None):
 
     headers = {}
     if args.github_access_token:
-        headers = {"Authorization", f"token {args.github_access_token}"}
+        headers = {"Authorization": f"token {args.github_access_token}"}
     else:
         print("No GitHub access token provided. Will fail to access private repos.")
 
