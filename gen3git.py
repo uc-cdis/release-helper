@@ -6,6 +6,7 @@ to create release notes.
 import argparse
 import os
 import re
+import sys
 
 import requests
 from datetime import datetime, timedelta
@@ -336,6 +337,18 @@ def main(args=None):
         start_date = datetime.strptime(args.from_date, "%Y-%m-%d")
     if hasattr(args, "to_date") and args.to_date is not None:
         stop_date = datetime.strptime(args.to_date, "%Y-%m-%d")
+
+    # TODO: Revisit this whole logic to adopt proper githubapi requests
+    # instead of this `branch_commits` approach that is not compatible with private repos
+    # Skipping private repos for now
+    private_check = requests.get(
+        "https://api.github.com/repos/%s" % (uri),
+        headers=headers,
+    )
+    resp.raise_for_status()
+    private_check_json = private_check.json()
+    if private_check_json["private"] == True:
+        sys.exit(0)
 
     for commit in repo.get_commits(since=start_date, until=stop_date):
         # https://platform.github.community/t/get-pull-request-associated-with-merge-commit/6936
