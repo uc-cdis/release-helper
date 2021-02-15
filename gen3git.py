@@ -333,7 +333,7 @@ def main(args=None):
         stop_date = datetime.strptime(args.to_date, "%Y-%m-%d")
 
     # TODO: Revisit this whole logic to adopt proper githubapi requests
-    # instead of this `branch_commits` approach that is not compatible with private repos
+    # instead of this `branch_commits` approach that is not compatible with private repos. See ticket PXP-7714
     # Skipping private repos for now
     private_check = requests.get(
         "https://api.github.com/repos/%s" % (uri),
@@ -342,12 +342,15 @@ def main(args=None):
     resp.raise_for_status()
     private_check_json = private_check.json()
     if private_check_json["private"] == True:
+        print("Cannot access private repos at the moment - exiting")
         sys.exit(0)
 
     for commit in repo.get_commits(since=start_date, until=stop_date):
         # https://platform.github.community/t/get-pull-request-associated-with-merge-commit/6936
         # https://github.blog/2014-10-13-linking-merged-pull-requests-from-commits/
-        # We are not using the search API because its rate limit is too low
+        # We are not using the search API because its rate limit is too low.
+        # This doesn't work for private repos, and we can't attach headers
+        # because it's not a GitHub API endpoint. See ticket PXP-7714
         resp = requests.get(
             "https://github.com/%s/branch_commits/%s" % (uri, commit.sha)
         )
