@@ -207,7 +207,7 @@ def get_command_line_args():
     parser.add_argument(
         "--github-access-token",
         type=str,
-        default=os.environ.get("GH_TOKEN"),
+        default=os.environ.get("GH_TOKEN", os.environ.get("GITHUB_TOKEN")),
         help="GitHub access token for accessing private repositories if any.",
     )
 
