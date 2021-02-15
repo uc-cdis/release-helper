@@ -207,7 +207,7 @@ def get_command_line_args():
     parser.add_argument(
         "--github-access-token",
         type=str,
-        default=os.environ.get("GH_TOKEN", os.environ.get("GITHUB_TOKEN")),
+        default=os.environ.get("GH_TOKEN"),
         help="GitHub access token for accessing private repositories if any.",
     )
 
@@ -234,12 +234,6 @@ def main(args=None):
         g = Github(args.github_access_token)
     else:
         g = Github()
-
-    headers = {}
-    if args.github_access_token:
-        headers = {"Authorization", f"token {args.github_access_token}"}
-    else:
-        print("No GitHub access token provided. Will fail to access private repos.")
 
     # Get GitHub Repository
     git = Repo(search_parent_directories=True)
@@ -355,8 +349,7 @@ def main(args=None):
         # https://github.blog/2014-10-13-linking-merged-pull-requests-from-commits/
         # We are not using the search API because its rate limit is too low
         resp = requests.get(
-            "https://github.com/%s/branch_commits/%s" % (uri, commit.sha),
-            headers=headers,
+            "https://github.com/%s/branch_commits/%s" % (uri, commit.sha)
         )
         resp.raise_for_status()
         prs = _GITHUB_PR.findall(resp.text)
