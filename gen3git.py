@@ -343,7 +343,7 @@ def main(args=None):
         "https://api.github.com/repos/%s" % (uri),
         headers=headers,
     )
-    resp.raise_for_status()
+    private_check.raise_for_status()
     private_check_json = private_check.json()
     if private_check_json["private"] == True:
         print("Cannot access private repos at the moment - exiting")
