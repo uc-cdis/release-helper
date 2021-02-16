@@ -237,7 +237,7 @@ def main(args=None):
 
     headers = {}
     if args.github_access_token:
-        headers = {"Authorization", f"token {args.github_access_token}"}
+        headers = {"Authorization": f"token {args.github_access_token}"}
 
     # Get GitHub Repository
     git = Repo(search_parent_directories=True)
