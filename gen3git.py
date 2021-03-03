@@ -305,6 +305,8 @@ def main(args=None):
         start_tag = None
         for tag in repo.get_tags():
             ver = parse_version(tag.name)
+            if upper_bound and ver == upper_bound:
+                continue
             if (
                 not start_tag
                 or ver > parse_version(start_tag.name)
