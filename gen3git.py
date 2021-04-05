@@ -6,6 +6,7 @@ to create release notes.
 import argparse
 import os
 import re
+import sys
 
 import requests
 from datetime import datetime, timedelta
@@ -176,7 +177,7 @@ def get_command_line_args():
         "--to-date",
         type=str,
         help="Date to stop collecting release notes at (inclusive), format - YYYY-MM-DD, "
-             "default is $TRAVIS_TAG if set, or current git HEAD.",
+        "default is $TRAVIS_TAG if set, or current git HEAD.",
     )
     gen.add_argument(
         "--file-name",
@@ -206,7 +207,7 @@ def get_command_line_args():
     parser.add_argument(
         "--github-access-token",
         type=str,
-        default=os.environ.get("GH_TOKEN"),
+        default=os.environ.get("GH_TOKEN", os.environ.get("GITHUB_TOKEN")),
         help="GitHub access token for accessing private repositories if any.",
     )
 
@@ -234,6 +235,10 @@ def main(args=None):
     else:
         g = Github()
 
+    headers = {}
+    if args.github_access_token:
+        headers = {"Authorization": f"token {args.github_access_token}"}
+
     # Get GitHub Repository
     git = Repo(search_parent_directories=True)
     if args.repo:
@@ -253,7 +258,11 @@ def main(args=None):
             print("Multiple URL found, please manually specify.")
             return
 
-        uri = u"".join(_GITHUB_REMOTE.findall(uri)[0])
+        matches = _GITHUB_REMOTE.findall(uri)
+        if not matches:
+            print(f"Unable to match remote uri {uri} to regex `{_GITHUB_REMOTE}`")
+            return
+        uri = "".join(matches[0])
 
     repo = g.get_repo(uri)
     print("GitHub Repository: %s" % repo.full_name)
@@ -296,6 +305,9 @@ def main(args=None):
         start_tag = None
         for tag in repo.get_tags():
             ver = parse_version(tag.name)
+            # account for case where no start tag and ver is same as upper_bound
+            if upper_bound and ver == upper_bound:
+                continue
             if (
                 not start_tag
                 or ver > parse_version(start_tag.name)
@@ -329,10 +341,25 @@ def main(args=None):
     if to_date:
         stop_date = datetime.strptime(to_date, "%Y-%m-%d")
 
+    # TODO: Revisit this whole logic to adopt proper githubapi requests
+    # instead of this `branch_commits` approach that is not compatible with private repos. See ticket PXP-7714
+    # Skipping private repos for now
+    private_check = requests.get(
+        "https://api.github.com/repos/%s" % (uri),
+        headers=headers,
+    )
+    private_check.raise_for_status()
+    private_check_json = private_check.json()
+    if private_check_json["private"] == True:
+        print("Cannot access private repos at the moment - exiting")
+        sys.exit(0)
+
     for commit in repo.get_commits(since=start_date, until=stop_date):
         # https://platform.github.community/t/get-pull-request-associated-with-merge-commit/6936
         # https://github.blog/2014-10-13-linking-merged-pull-requests-from-commits/
-        # We are not using the search API because its rate limit is too low
+        # We are not using the search API because its rate limit is too low.
+        # This doesn't work for private repos, and we can't attach headers
+        # because it's not a GitHub API endpoint. See ticket PXP-7714
         resp = requests.get(
             "https://github.com/%s/branch_commits/%s" % (uri, commit.sha)
         )
@@ -449,6 +476,7 @@ def parse_line(line):
         or line == "Implemented XXX"
         or line == "This pull request was generated automatically."
         or line == "None"
+        or (line.startswith("<!--") and line.endswith("-->"))
     ):
         return None
 
