@@ -450,7 +450,7 @@ def parse_pr_body(body, release_notes, ref):
 
         # handle dependabot PRs
         if "Dependabot commands and options" in body:
-            category = "Dependency Updates"
+            category = "dependency updates"
             for line in body.splitlines():
                 if line.startswith("Bumps"):
                     release_notes.setdefault(category, []).append(
