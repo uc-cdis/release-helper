@@ -264,6 +264,7 @@ def main(args=None):
             return
         uri = "".join(matches[0])
 
+    print("GitHub Repository URI: %s" % uri)
     repo = g.get_repo(uri)
     print("GitHub Repository: %s" % repo.full_name)
 
@@ -403,11 +404,15 @@ Generated: {}
             additional_text=additional_text,
         )
         if release_tag:
+            print("Release tag: %s" % release_tag)
             try:
                 release = repo.get_release(release_tag)
             except Exception:
                 pass
             else:
+                print(
+                    "Updating release (if this fails, make sure you have write access to the repo)"
+                )
                 release.update_release(
                     release.title, markdown, release.draft, release.prerelease
                 )
