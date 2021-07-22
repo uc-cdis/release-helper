@@ -274,7 +274,7 @@ def main(args=None):
     to_tag = getattr(args, "to_tag", None) or release_tag
     if to_tag:
         for tag in repo.get_tags():
-            if to_tag in tag.name:
+            if to_tag == tag.name:
                 stop_tag = tag.name
                 stop_commit = tag.commit
                 break
@@ -295,7 +295,7 @@ def main(args=None):
     # Get commit to start collect changelogs from (exclusive)
     if args.from_tag:
         for tag in repo.get_tags():
-            if args.from_tag in tag.name:
+            if args.from_tag == tag.name:
                 start_tag = tag
                 break
         else:
