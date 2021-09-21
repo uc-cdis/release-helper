@@ -360,6 +360,7 @@ def main(args=None):
         # We are not using the search API because its rate limit is too low.
         # This doesn't work for private repos, and we can't attach headers
         # because it's not a GitHub API endpoint. See ticket PXP-7714
+        print("Find Commit %s" % commit.sha)
         resp = requests.get(
             "https://github.com/%s/branch_commits/%s" % (uri, commit.sha)
         )
