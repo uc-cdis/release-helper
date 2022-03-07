@@ -233,6 +233,9 @@ def main(args=None):
     if args.github_access_token:
         g = Github(args.github_access_token)
     else:
+        print(
+            "Warning: No GitHub access token, might run into rate limits. Use --github-access-token or set the enviroment variable GH_TOKEN or GITHUB_TOKEN to set a token."
+        )
         g = Github()
 
     headers = {}
@@ -479,7 +482,7 @@ def parse_pr_body(body, release_notes, ref):
 
 
 def parse_line(line):
-    line = line.strip().strip("*").strip().strip("-").strip().strip("-").strip()
+    line = line.strip().lstrip("*").lstrip().lstrip("-").lstrip().lstrip("-").lstrip()
 
     if (
         "Please make sure to follow the [DEV guidelines]" in line
