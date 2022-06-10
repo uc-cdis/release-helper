@@ -333,7 +333,7 @@ def main(args=None):
     # add 1 second to the start date because the start commit should
     # be excluded from the result:
     start_date = start_tag.commit.commit.author.date + timedelta(0, 1)
-    stop_date = datetime.now()
+    stop_date = datetime.utcnow()
 
     # If dates are specified by the user, they override dates from tags/commits
     if hasattr(args, "from_date") and args.from_date is not None:
