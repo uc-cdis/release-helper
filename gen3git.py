@@ -333,9 +333,7 @@ def main(args=None):
     # add 1 second to the start date because the start commit should
     # be excluded from the result:
     start_date = start_tag.commit.commit.author.date + timedelta(0, 1)
-    # add 5 seconds to the stop date because the PR's "merged_at" date may
-    # be a few seconds after the merged commit is created in master:
-    stop_date = stop_commit.commit.author.date + timedelta(0, 5)
+    stop_date = datetime.now()
 
     # If dates are specified by the user, they override dates from tags/commits
     if hasattr(args, "from_date") and args.from_date is not None:
