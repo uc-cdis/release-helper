@@ -354,6 +354,21 @@ def main(args=None):
         print("Cannot access private repos at the moment - exiting")
         sys.exit(0)
 
+    output_type = None
+    if getattr(args, "markdown", release_tag):
+        output_type = "markdown"
+    elif getattr(args, "html", False):
+        output_type = "html"
+    elif getattr(args, "text", False) or not any(
+        [
+            getattr(args, "new_tag", None),
+            hasattr(args, "release_tag"),
+            getattr(args, "markdown", False),
+            getattr(args, "html", False),
+        ]
+    ):
+        output_type = "text"
+
     for commit in repo.get_commits(since=start_date, until=stop_date):
         # https://platform.github.community/t/get-pull-request-associated-with-merge-commit/6936
         # https://github.blog/2014-10-13-linking-merged-pull-requests-from-commits/
@@ -376,14 +391,21 @@ def main(args=None):
                     # stop date. (ignore commits that were pushed before the
                     # stop date if their PR was merged after)
                     if repo_pr.merged_at <= stop_date:
-                        desc_bodies.append((pr, repo_pr.body))
+                        desc_bodies.append((pr, "pr", repo_pr.body))
         else:
             print("Commit %s: no PR" % commit.sha)
-            desc_bodies.append((commit.sha[:6], commit.commit.message))
+            desc_bodies.append((commit.sha[:6], "commit", commit.commit.message))
 
     release_notes_raw = {"general updates": []}
-    for ref, pr in desc_bodies:
-        release_notes_raw = parse_pr_body(pr, release_notes_raw, ref)
+    for ref, ref_type, pr in desc_bodies:
+        release_notes_raw = parse_pr_body(
+            body=pr,
+            release_notes=release_notes_raw,
+            ref=ref,
+            ref_type=ref_type,
+            repo_uri=uri,
+            link_type=output_type,
+        )
 
     release_notes = ReleaseNotes(release_notes_raw)
     additional_text = """\
@@ -398,7 +420,7 @@ Generated: {}
         datetime.now().date(),
     )
 
-    if getattr(args, "markdown", release_tag):
+    if output_type == "markdown":
         markdown = release_notes.export(
             type_=ReleaseNotes.ExportType.MARKDOWN,
             file=(args.file_name + ".md") if hasattr(args, "file_name") else None,
@@ -418,21 +440,14 @@ Generated: {}
                     release.title, markdown, release.draft, release.prerelease
                 )
 
-    if getattr(args, "html", False):
+    if output_type == "html":
         release_notes.export(
             type_=ReleaseNotes.ExportType.HTML,
             file=(args.file_name + ".html") if hasattr(args, "file_name") else None,
             additional_text=additional_text,
         )
 
-    if getattr(args, "text", False) or not any(
-        [
-            getattr(args, "new_tag", None),
-            hasattr(args, "release_tag"),
-            getattr(args, "markdown", False),
-            getattr(args, "html", False),
-        ]
-    ):
+    if output_type == "text":
         release_notes.export(
             type_=ReleaseNotes.ExportType.TEXT,
             file=(args.file_name + ".txt") if hasattr(args, "file_name") else None,
@@ -450,7 +465,30 @@ Generated: {}
         return release_notes.release_notes
 
 
-def parse_pr_body(body, release_notes, ref):
+def parse_pr_body(
+    body,
+    release_notes,
+    ref,
+    ref_type=None,
+    repo_uri=None,
+    link_type="markdown",
+):
+    # by default, internal markdown (markdown link to a PR in the same repo)
+    ref_link = "#{}".format(ref)
+    if repo_uri and ref_type == "pr":
+        # this works for PR numbers, but not for commit hashes
+        if link_type == "markdown":
+            # markdown link to a PR in the same or a different repo
+            ref_link = "[#{}](https://github.com/{}/pull/{})".format(ref, repo_uri, ref)
+        elif link_type == "html":  # to send in emails
+            ref_link = '<a href="https://github.com/{}/pull/{}">#{}</a>'.format(
+                repo_uri, ref, ref
+            )
+        elif link_type == "slack":  # to post on slack
+            ref_link = "<https://github.com/{}/pull/{}|#{}>".format(repo_uri, ref, ref)
+        elif link_type == "text":  # to display as plain text
+            ref_link = "https://github.com/{}/pull/{}".format(repo_uri, ref)
+
     category = "general updates"
     if body:
 
@@ -472,7 +510,7 @@ def parse_pr_body(body, release_notes, ref):
             elif line:
                 line = parse_line(line)
                 if line:
-                    release_notes[category].append("%s (#%s)" % (line, ref))
+                    release_notes[category].append("%s (%s)" % (line, ref_link))
             else:
                 continue
 
