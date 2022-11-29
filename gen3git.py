@@ -392,7 +392,8 @@ def main(args=None):
     private_check.raise_for_status()
     private_check_json = private_check.json()
     if private_check_json["private"] == True:
-        raise Exception("Cannot access private repos at the moment")
+        print("Cannot access private repos at the moment - exiting")
+        sys.exit(0)
 
     output_type = None
     if getattr(args, "markdown", release_tag):
@@ -409,22 +410,7 @@ def main(args=None):
     ):
         output_type = "text"
 
-    if not to_tag:
-        # get the commits on master branch
-        commits = repo.get_commits(since=start_date, until=stop_date)
-    else:
-        # only get the commits that are included in the specified tag.
-        # handles edge case when the tag includes a recent commit and `stop_date` is more recent
-        # than some master branch commits that should not be included. Example:
-        # - master branch commits:
-        #     01/20: commit2 (not in tag) <-------------------- should not be included
-        #     01/01: commit1 (in tag)
-        # - tag commits:
-        #     01/25: merge commit or cherry-pick commit <------ `stop_date` = 01/25
-        #     01/01: commit1
-        commits = repo.get_commits(since=start_date, until=stop_date, sha=to_tag)
-
-    for commit in commits:
+    for commit in repo.get_commits(since=start_date, until=stop_date):
         # https://platform.github.community/t/get-pull-request-associated-with-merge-commit/6936
         # https://github.blog/2014-10-13-linking-merged-pull-requests-from-commits/
         # We are not using the search API because its rate limit is too low.
@@ -446,7 +432,7 @@ def main(args=None):
                     # only parse the PR description if it was merged after the
                     # stop date. (ignore commits that were pushed before the
                     # stop date if their PR was merged after)
-                    if repo_pr.merged_at.replace(tzinfo=pytz.UTC) <= stop_date:
+                    if repo_pr.merged_at <= stop_date:
                         desc_bodies.append((pr, "pr", repo_pr.body))
         else:
             print("Commit %s: no PR" % commit.sha)
