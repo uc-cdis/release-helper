@@ -233,6 +233,9 @@ def main(args=None):
     if args.github_access_token:
         g = Github(args.github_access_token)
     else:
+        print(
+            "Warning: No GitHub access token, might run into rate limits. Use --github-access-token or set the enviroment variable GH_TOKEN or GITHUB_TOKEN to set a token."
+        )
         g = Github()
 
     headers = {}
@@ -264,6 +267,7 @@ def main(args=None):
             return
         uri = "".join(matches[0])
 
+    print("GitHub Repository URI: %s" % uri)
     repo = g.get_repo(uri)
     print("GitHub Repository: %s" % repo.full_name)
 
@@ -273,7 +277,7 @@ def main(args=None):
     to_tag = getattr(args, "to_tag", None) or release_tag
     if to_tag:
         for tag in repo.get_tags():
-            if to_tag in tag.name:
+            if to_tag == tag.name:
                 stop_tag = tag.name
                 stop_commit = tag.commit
                 break
@@ -294,7 +298,7 @@ def main(args=None):
     # Get commit to start collect changelogs from (exclusive)
     if args.from_tag:
         for tag in repo.get_tags():
-            if args.from_tag in tag.name:
+            if args.from_tag == tag.name:
                 start_tag = tag
                 break
         else:
@@ -329,9 +333,7 @@ def main(args=None):
     # add 1 second to the start date because the start commit should
     # be excluded from the result:
     start_date = start_tag.commit.commit.author.date + timedelta(0, 1)
-    # add 5 seconds to the stop date because the PR's "merged_at" date may
-    # be a few seconds after the merged commit is created in master:
-    stop_date = stop_commit.commit.author.date + timedelta(0, 5)
+    stop_date = datetime.utcnow()
 
     # Modifying for gen3release support to generate release notes based on the dates
     from_date = getattr(args, "from_date", None)
@@ -353,6 +355,21 @@ def main(args=None):
     if private_check_json["private"] == True:
         print("Cannot access private repos at the moment - exiting")
         sys.exit(0)
+
+    output_type = None
+    if getattr(args, "markdown", release_tag):
+        output_type = "markdown"
+    elif getattr(args, "html", False):
+        output_type = "html"
+    elif getattr(args, "text", False) or not any(
+        [
+            getattr(args, "new_tag", None),
+            hasattr(args, "release_tag"),
+            getattr(args, "markdown", False),
+            getattr(args, "html", False),
+        ]
+    ):
+        output_type = "text"
 
     for commit in repo.get_commits(since=start_date, until=stop_date):
         # https://platform.github.community/t/get-pull-request-associated-with-merge-commit/6936
@@ -377,51 +394,55 @@ def main(args=None):
                     # stop date. (ignore commits that were pushed before the
                     # stop date if their PR was merged after)
                     if repo_pr.merged_at <= stop_date:
-                        desc_bodies.append((pr, repo_pr.body))
+                        desc_bodies.append((pr, "pr", repo_pr.body))
         else:
             print("Commit %s: no PR" % commit.sha)
-            desc_bodies.append((commit.sha[:6], commit.commit.message))
+            desc_bodies.append((commit.sha[:6], "commit", commit.commit.message))
 
     release_notes_raw = {"general updates": []}
-    for ref, pr in desc_bodies:
-        release_notes_raw = parse_pr_body(pr, release_notes_raw, ref)
+    for ref, ref_type, pr in desc_bodies:
+        release_notes_raw = parse_pr_body(
+            body=pr,
+            release_notes=release_notes_raw,
+            ref=ref,
+            ref_type=ref_type,
+            repo_uri=uri,
+            link_type=output_type,
+        )
 
     release_notes = ReleaseNotes(release_notes_raw)
 
     # Modifying format for gen3release Release Notes
     additional_text = "## {}".format(repo.full_name)
 
-    if getattr(args, "markdown", release_tag):
+    if output_type == "markdown":
         markdown = release_notes.export(
             type_=ReleaseNotes.ExportType.MARKDOWN,
             file=(args.file_name + ".md") if hasattr(args, "file_name") else None,
             additional_text=additional_text,
         )
         if release_tag:
+            print("Release tag: %s" % release_tag)
             try:
                 release = repo.get_release(release_tag)
             except Exception:
                 pass
             else:
+                print(
+                    "Updating release (if this fails, make sure you have write access to the repo)"
+                )
                 release.update_release(
                     release.title, markdown, release.draft, release.prerelease
                 )
 
-    if getattr(args, "html", False):
+    if output_type == "html":
         release_notes.export(
             type_=ReleaseNotes.ExportType.HTML,
             file=(args.file_name + ".html") if hasattr(args, "file_name") else None,
             additional_text=additional_text,
         )
 
-    if getattr(args, "text", False) or not any(
-        [
-            getattr(args, "new_tag", None),
-            hasattr(args, "release_tag"),
-            getattr(args, "markdown", False),
-            getattr(args, "html", False),
-        ]
-    ):
+    if output_type == "text":
         release_notes.export(
             type_=ReleaseNotes.ExportType.TEXT,
             file=(args.file_name + ".txt") if hasattr(args, "file_name") else None,
@@ -439,13 +460,36 @@ def main(args=None):
         return release_notes.release_notes
 
 
-def parse_pr_body(body, release_notes, ref):
+def parse_pr_body(
+    body,
+    release_notes,
+    ref,
+    ref_type=None,
+    repo_uri=None,
+    link_type="markdown",
+):
+    # by default, internal markdown (markdown link to a PR in the same repo)
+    ref_link = "#{}".format(ref)
+    if repo_uri and ref_type == "pr":
+        # this works for PR numbers, but not for commit hashes
+        if link_type == "markdown":
+            # markdown link to a PR in the same or a different repo
+            ref_link = "[#{}](https://github.com/{}/pull/{})".format(ref, repo_uri, ref)
+        elif link_type == "html":  # to send in emails
+            ref_link = '<a href="https://github.com/{}/pull/{}">#{}</a>'.format(
+                repo_uri, ref, ref
+            )
+        elif link_type == "slack":  # to post on slack
+            ref_link = "<https://github.com/{}/pull/{}|#{}>".format(repo_uri, ref, ref)
+        elif link_type == "text":  # to display as plain text
+            ref_link = "https://github.com/{}/pull/{}".format(repo_uri, ref)
+
     category = "general updates"
     if body:
 
         # handle dependabot PRs
         if "Dependabot commands and options" in body:
-            category = "Dependency Updates"
+            category = "dependency updates"
             for line in body.splitlines():
                 if line.startswith("Bumps"):
                     release_notes.setdefault(category, []).append(
@@ -461,7 +505,7 @@ def parse_pr_body(body, release_notes, ref):
             elif line:
                 line = parse_line(line)
                 if line:
-                    release_notes[category].append("%s (#%s)" % (line, ref))
+                    release_notes[category].append("%s (%s)" % (line, ref_link))
             else:
                 continue
 
@@ -469,7 +513,7 @@ def parse_pr_body(body, release_notes, ref):
 
 
 def parse_line(line):
-    line = line.strip().strip("*").strip().strip("-").strip().strip("-").strip()
+    line = line.strip().lstrip("*").lstrip().lstrip("-").lstrip().lstrip("-").lstrip()
 
     if (
         "Please make sure to follow the [DEV guidelines]" in line
