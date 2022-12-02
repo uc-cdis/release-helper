@@ -113,11 +113,12 @@ class ReleaseNotes(object):
     def _get_word_actual_len(word):
         word_actual_len = len(word)
 
-        # if this is a markdown link in parenthesis `([link text](link url))`
+        # if this is a markdown link in parentheses `([link text](link url))`
         # then return the length of the link text
         matches = _MARKDOWN_LINK.findall(word)
         if matches:
-            word_actual_len = len(matches[0])
+            # +2 to account for the parentheses around the text
+            word_actual_len = len(matches[0]) + 2
 
         return word_actual_len
 
@@ -151,11 +152,10 @@ class ReleaseNotes(object):
                     output += words[0] + " "
                     del words[0]
 
-            # hit 76 char limit or used all the words, new line
-            output += "\n    "
-
-            # more words? call this function recursively to continue breaking into chunks
+            # hit 76 char limit or used all the words.
+            # more words? new line and call this function recursively to continue breaking into chunks
             if words:
+                output += "\n    "
                 output += ReleaseNotes._breakup_line(" ".join(words))
 
         return output
