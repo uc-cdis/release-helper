@@ -17,6 +17,7 @@ from pkg_resources import parse_version
 
 _GITHUB_REMOTE = re.compile(r"git@github.com:(.*).git|https://github.com/(.*).git")
 _GITHUB_PR = re.compile(r'href="[^"]+/pull/(\d+)"', re.DOTALL)
+_MARKDOWN_LINK = re.compile(r"^\(\[(.*)\]\(http.*\)$")
 
 
 class ReleaseNotes(object):
@@ -109,6 +110,19 @@ class ReleaseNotes(object):
         return output
 
     @staticmethod
+    def _get_word_actual_len(word):
+        word_actual_len = len(word)
+
+        # if this is a markdown link in parentheses `([link text](link url))`
+        # then return the length of the link text
+        matches = _MARKDOWN_LINK.findall(word)
+        if matches:
+            # +2 to account for the parentheses around the text
+            word_actual_len = len(matches[0]) + 2
+
+        return word_actual_len
+
+    @staticmethod
     def _breakup_line(line):
         """
         Keep it under 80 chars assuming two spaces, a dash, and another space in front
@@ -125,20 +139,23 @@ class ReleaseNotes(object):
 
             # given a list of words, keep trying to add another word without going over
             # 76 chars. if a single word is longer than 76 chars, add it anyway
-            if len(words[0]) >= break_value:
+            if ReleaseNotes._get_word_actual_len(words[0]) >= break_value:
                 output += words[0]
                 del words[0]
             else:
-                while words and ((total_length + len(words[0])) < break_value):
-                    total_length += len(words[0]) + 1  # 1 for space
+                while words and (
+                    (total_length + ReleaseNotes._get_word_actual_len(words[0]))
+                    < break_value
+                ):
+                    # 1 for space
+                    total_length += ReleaseNotes._get_word_actual_len(words[0]) + 1
                     output += words[0] + " "
                     del words[0]
 
-            # hit 76 char limit or used all the words, new line
-            output += "\n    "
-
-            # more words? call this function recursively to continue breaking into chunks
+            # hit 76 char limit or used all the words.
+            # more words? new line and call this function recursively to continue breaking into chunks
             if words:
+                output += "\n    "
                 output += ReleaseNotes._breakup_line(" ".join(words))
 
         return output
