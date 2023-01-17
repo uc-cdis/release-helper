@@ -368,7 +368,7 @@ def main(args=None):
     private_check.raise_for_status()
     private_check_json = private_check.json()
     if private_check_json["private"] == True:
-        raise Exception("Cannot access private repos at the moment - exiting")
+        raise Exception("Cannot access private repos at the moment")
 
     output_type = None
     if getattr(args, "markdown", release_tag):
