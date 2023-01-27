@@ -543,6 +543,7 @@ def parse_line(line):
         or line == "This pull request was generated automatically."
         or line == "None"
         or (line.startswith("<!--") and line.endswith("-->"))
+        or re.compile(r"^\[.*\]: http.*$").match(line)  # ignore github autolinks
     ):
         return None
 
