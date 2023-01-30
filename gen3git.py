@@ -370,8 +370,7 @@ def main(args=None):
     private_check.raise_for_status()
     private_check_json = private_check.json()
     if private_check_json["private"] == True:
-        print("Cannot access private repos at the moment - exiting")
-        sys.exit(0)
+        raise Exception("Cannot access private repos at the moment")
 
     output_type = None
     if getattr(args, "markdown", release_tag):
@@ -539,6 +538,7 @@ def parse_line(line):
         or line == "This pull request was generated automatically."
         or line == "None"
         or (line.startswith("<!--") and line.endswith("-->"))
+        or re.compile(r"^\[.*\]: http.*$").match(line)  # ignore github autolinks
     ):
         return None
 
