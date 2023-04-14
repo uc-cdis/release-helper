@@ -353,10 +353,13 @@ def main(args=None):
     stop_date = datetime.utcnow()
 
     # If dates are specified by the user, they override dates from tags/commits
-    if hasattr(args, "from_date") and args.from_date is not None:
-        start_date = datetime.strptime(args.from_date, "%Y-%m-%d")
-    if hasattr(args, "to_date") and args.to_date is not None:
-        stop_date = datetime.strptime(args.to_date, "%Y-%m-%d")
+    from_date = getattr(args, "from_date", None)
+    if from_date:
+        start_date = datetime.strptime(from_date, "%Y-%m-%d")
+    to_date = getattr(args, "to_date", None)
+    if to_date:
+        stop_date = datetime.strptime(to_date, "%Y-%m-%d")
+    print("Start date: %s; Stop date: %s" % (start_date, stop_date))
 
     # TODO: Revisit this whole logic to adopt proper githubapi requests
     # instead of this `branch_commits` approach that is not compatible with private repos. See ticket PXP-7714
@@ -385,7 +388,22 @@ def main(args=None):
     ):
         output_type = "text"
 
-    for commit in repo.get_commits(since=start_date, until=stop_date):
+    if not to_tag:
+        # get the commits on master branch
+        commits = repo.get_commits(since=start_date, until=stop_date)
+    else:
+        # only get the commits that are included in the specified tag.
+        # handles edge case when the tag includes a recent commit and `stop_date` is more recent
+        # than some master branch commits that should not be included. Example:
+        # - master branch commits:
+        #     01/20: commit2 (not in tag) <-------------------- should not be included
+        #     01/01: commit1 (in tag)
+        # - tag commits:
+        #     01/25: merge commit or cherry-pick commit <------ `stop_date` = 01/25
+        #     01/01: commit1
+        commits = repo.get_commits(since=start_date, until=stop_date, sha=to_tag)
+
+    for commit in commits:
         # https://platform.github.community/t/get-pull-request-associated-with-merge-commit/6936
         # https://github.blog/2014-10-13-linking-merged-pull-requests-from-commits/
         # We are not using the search API because its rate limit is too low.
