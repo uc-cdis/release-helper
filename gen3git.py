@@ -537,7 +537,7 @@ def parse_pr_body(
             return release_notes
 
         for line in body.splitlines():
-            if line.startswith("###"):
+            if line.startswith("### "):
                 category = line.replace("###", "").strip().lower()
                 if category not in release_notes:
                     release_notes[category] = []
