@@ -13,11 +13,18 @@ from datetime import datetime, timedelta
 from enum import Enum
 from git import Repo
 from github import Github
-from pkg_resources import parse_version
+from packaging.version import parse, Version, InvalidVersion # TODO install
 
 _GITHUB_REMOTE = re.compile(r"git@github.com:(.*).git|https://github.com/(.*).git")
 _GITHUB_PR = re.compile(r'href="[^"]+/pull/(\d+)"', re.DOTALL)
 _MARKDOWN_LINK = re.compile(r"^\(\[(.*)\]\(http.*\)$")
+
+
+def parse_version(name):
+    try:
+        return parse(name)
+    except InvalidVersion:
+       return name
 
 
 class ReleaseNotes(object):
@@ -329,9 +336,14 @@ def main(args=None):
             # account for case where no start tag and ver is same as upper_bound
             if upper_bound and ver == upper_bound:
                 continue
+            # find the most recent tag that's lower than `stop_tag`
+            start_ver = parse_version(start_tag.name) if start_tag else None
             if (
                 not start_tag
-                or ver > parse_version(start_tag.name)
+                or (
+                    isinstance(ver, Version) and isinstance(start_ver, Version)  # ignore non-semantic tags
+                    and ver > parse_version(start_tag.name)
+                )
                 and (not upper_bound or ver < upper_bound)
             ):
                 start_tag = tag
