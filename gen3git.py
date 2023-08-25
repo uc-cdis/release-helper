@@ -268,10 +268,10 @@ def main(args=None):
         headers = {"Authorization": f"token {args.github_access_token}"}
 
     # Get GitHub Repository
-    git = Repo(search_parent_directories=True)
     if args.repo:
         uri = args.repo
     else:
+        git = Repo(search_parent_directories=True)
         tracking_branch = git.active_branch.tracking_branch()
         if not tracking_branch:
             print(
