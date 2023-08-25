@@ -13,8 +13,8 @@ from datetime import datetime, timedelta
 from enum import Enum
 from git import Repo
 from github import Github
-from packaging.version import parse, Version, InvalidVersion  # TODO install
-import pytz  # TODO install
+from packaging.version import parse, Version, InvalidVersion
+import pytz
 
 _GITHUB_REMOTE = re.compile(r"git@github.com:(.*).git|https://github.com/(.*).git")
 _GITHUB_PR = re.compile(r'href="[^"]+/pull/(\d+)"', re.DOTALL)
