@@ -13,11 +13,19 @@ from datetime import datetime, timedelta
 from enum import Enum
 from git import Repo
 from github import Github
-from pkg_resources import parse_version
+from packaging.version import parse, Version, InvalidVersion
+import pytz
 
 _GITHUB_REMOTE = re.compile(r"git@github.com:(.*).git|https://github.com/(.*).git")
 _GITHUB_PR = re.compile(r'href="[^"]+/pull/(\d+)"', re.DOTALL)
 _MARKDOWN_LINK = re.compile(r"^\(\[(.*)\]\(http.*\)$")
+
+
+def parse_version(name):
+    try:
+        return parse(name)
+    except InvalidVersion:
+        return name
 
 
 class ReleaseNotes(object):
@@ -260,10 +268,10 @@ def main(args=None):
         headers = {"Authorization": f"token {args.github_access_token}"}
 
     # Get GitHub Repository
-    git = Repo(search_parent_directories=True)
     if args.repo:
         uri = args.repo
     else:
+        git = Repo(search_parent_directories=True)
         tracking_branch = git.active_branch.tracking_branch()
         if not tracking_branch:
             print(
@@ -329,9 +337,17 @@ def main(args=None):
             # account for case where no start tag and ver is same as upper_bound
             if upper_bound and ver == upper_bound:
                 continue
+            # find the most recent tag that's lower than `stop_tag`
+            start_ver = parse_version(start_tag.name) if start_tag else None
             if (
                 not start_tag
-                or ver > parse_version(start_tag.name)
+                or (
+                    # ignore non-semantic tags
+                    isinstance(ver, Version)
+                    and isinstance(start_ver, Version)
+                    # check if this tag is more recent than the current `start_tag`
+                    and ver > start_ver
+                )
                 and (not upper_bound or ver < upper_bound)
             ):
                 start_tag = tag
@@ -359,6 +375,11 @@ def main(args=None):
     to_date = getattr(args, "to_date", None)
     if to_date:
         stop_date = datetime.strptime(to_date, "%Y-%m-%d")
+
+    # stop_date is timezone-naive, make it timezone-aware to avoid this error when comparing it to
+    # other datetimes: `TypeError: can't compare offset-naive and offset-aware datetimes`
+    stop_date = stop_date.replace(tzinfo=pytz.UTC)
+
     print("Start date: %s; Stop date: %s" % (start_date, stop_date))
 
     # TODO: Revisit this whole logic to adopt proper githubapi requests
