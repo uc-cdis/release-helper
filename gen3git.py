@@ -346,7 +346,7 @@ def main(args=None):
                     isinstance(ver, Version)
                     and isinstance(start_ver, Version)
                     # check if this tag is more recent than the current `start_tag`
-                    and ver > parse_version(start_tag.name)
+                    and ver > start_ver
                 )
                 and (not upper_bound or ver < upper_bound)
             ):
