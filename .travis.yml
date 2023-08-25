@@ -1,5 +1,5 @@
 language: python
-dist: xenial
+dist: jammy
 python:
 - 2.7
 - 3.9
