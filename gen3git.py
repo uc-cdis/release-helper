@@ -352,13 +352,14 @@ def main(args=None):
     start_date = start_tag.commit.commit.author.date + timedelta(0, 1)
     stop_date = datetime.utcnow()
 
-    # Modifying for gen3release support to generate release notes based on the dates
+    # If dates are specified by the user, they override dates from tags/commits
     from_date = getattr(args, "from_date", None)
     if from_date:
         start_date = datetime.strptime(from_date, "%Y-%m-%d")
     to_date = getattr(args, "to_date", None)
     if to_date:
         stop_date = datetime.strptime(to_date, "%Y-%m-%d")
+    print("Start date: %s; Stop date: %s" % (start_date, stop_date))
 
     # TODO: Revisit this whole logic to adopt proper githubapi requests
     # instead of this `branch_commits` approach that is not compatible with private repos. See ticket PXP-7714
@@ -387,7 +388,22 @@ def main(args=None):
     ):
         output_type = "text"
 
-    for commit in repo.get_commits(since=start_date, until=stop_date):
+    if not to_tag:
+        # get the commits on master branch
+        commits = repo.get_commits(since=start_date, until=stop_date)
+    else:
+        # only get the commits that are included in the specified tag.
+        # handles edge case when the tag includes a recent commit and `stop_date` is more recent
+        # than some master branch commits that should not be included. Example:
+        # - master branch commits:
+        #     01/20: commit2 (not in tag) <-------------------- should not be included
+        #     01/01: commit1 (in tag)
+        # - tag commits:
+        #     01/25: merge commit or cherry-pick commit <------ `stop_date` = 01/25
+        #     01/01: commit1
+        commits = repo.get_commits(since=start_date, until=stop_date, sha=to_tag)
+
+    for commit in commits:
         # https://platform.github.community/t/get-pull-request-associated-with-merge-commit/6936
         # https://github.blog/2014-10-13-linking-merged-pull-requests-from-commits/
         # We are not using the search API because its rate limit is too low.
@@ -514,7 +530,7 @@ def parse_pr_body(
             return release_notes
 
         for line in body.splitlines():
-            if line.startswith("###"):
+            if line.startswith("### "):
                 category = line.replace("###", "").strip().lower()
                 if category not in release_notes:
                     release_notes[category] = []
