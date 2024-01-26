@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from git import Repo
 from github import Github
-from packaging.version import parse, Version, InvalidVersion
+from pkg_resources import parse_version
 import pytz
 
 _GITHUB_REMOTE = re.compile(r"git@github.com:(.*).git|https://github.com/(.*).git")
