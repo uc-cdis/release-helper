@@ -14,6 +14,7 @@ from enum import Enum
 from git import Repo
 from github import Github
 from pkg_resources import parse_version
+import pytz
 
 _GITHUB_REMOTE = re.compile(r"git@github.com:(.*).git|https://github.com/(.*).git")
 _GITHUB_PR = re.compile(r'href="[^"]+/pull/(\d+)"', re.DOTALL)
