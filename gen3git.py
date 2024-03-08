@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from git import Repo
 from github import Github
-from pkg_resources import parse_version
+from packaging.version import parse, Version, InvalidVersion
 import pytz
 
 _GITHUB_REMOTE = re.compile(r"git@github.com:(.*).git|https://github.com/(.*).git")
@@ -103,13 +103,13 @@ class ReleaseNotes(object):
     def _get_markdown_output(self, title_text, additional_text):
         output = ""
 
-        # output += "# {}\n\n".format(title_text)
+        output += "# {}\n\n".format(title_text)
         output += additional_text.replace("\n", "\n\n") + "\n\n"
         for key, values in self.release_notes.items():
             # ignore items placed in the general description and just get following
             # sections. Don't include section if empty
             if key != "general updates" and values:
-                output += "#### " + key.title() + "\n"
+                output += "## " + key.title() + "\n"
                 for value in values:
                     output += "  - "
                     output += ReleaseNotes._breakup_line(value)
@@ -196,13 +196,13 @@ def get_command_line_args():
     parser.add_argument(
         "--from-date",
         type=str,
-        help="Date to start getting release notes from (inclusive), format - YYYY-MM-DD.",
+        help="Date to start getting release notes from (inclusive), format - YYYY-MM-DD. Overrides --from-tag argument. If not specified, falls back to default --from-tag.",
     )
     gen.add_argument(
         "--to-date",
         type=str,
         help="Date to stop collecting release notes at (inclusive), format - YYYY-MM-DD, "
-        "default is $TRAVIS_TAG if set, or current git HEAD.",
+        "Overrides --to-tag argument. If not specified, falls back to default --to-tag.",
     )
     gen.add_argument(
         "--file-name",
@@ -392,8 +392,7 @@ def main(args=None):
     private_check.raise_for_status()
     private_check_json = private_check.json()
     if private_check_json["private"] == True:
-        print("Cannot access private repos at the moment - exiting")
-        sys.exit(0)
+        raise Exception("Cannot access private repos at the moment")
 
     output_type = None
     if getattr(args, "markdown", release_tag):
@@ -410,13 +409,27 @@ def main(args=None):
     ):
         output_type = "text"
 
-    for commit in repo.get_commits(since=start_date, until=stop_date):
+    if not to_tag:
+        # get the commits on master branch
+        commits = repo.get_commits(since=start_date, until=stop_date)
+    else:
+        # only get the commits that are included in the specified tag.
+        # handles edge case when the tag includes a recent commit and `stop_date` is more recent
+        # than some master branch commits that should not be included. Example:
+        # - master branch commits:
+        #     01/20: commit2 (not in tag) <-------------------- should not be included
+        #     01/01: commit1 (in tag)
+        # - tag commits:
+        #     01/25: merge commit or cherry-pick commit <------ `stop_date` = 01/25
+        #     01/01: commit1
+        commits = repo.get_commits(since=start_date, until=stop_date, sha=to_tag)
+
+    for commit in commits:
         # https://platform.github.community/t/get-pull-request-associated-with-merge-commit/6936
         # https://github.blog/2014-10-13-linking-merged-pull-requests-from-commits/
         # We are not using the search API because its rate limit is too low.
         # This doesn't work for private repos, and we can't attach headers
         # because it's not a GitHub API endpoint. See ticket PXP-7714
-        print("Find Commit %s" % commit.sha)
         resp = requests.get(
             "https://github.com/%s/branch_commits/%s" % (uri, commit.sha)
         )
@@ -450,7 +463,6 @@ def main(args=None):
         )
 
     release_notes = ReleaseNotes(release_notes_raw)
-
     # Modifying format for gen3release Release Notes
     additional_text = "## {}".format(repo.full_name)
 
