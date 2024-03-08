@@ -202,7 +202,7 @@ def get_command_line_args():
         "--to-date",
         type=str,
         help="Date to stop collecting release notes at (inclusive), format - YYYY-MM-DD, "
-        "Overrides --to-tag argument. If not specified, falls back to default --to-tag.",
+        "default is $TRAVIS_TAG if set, or current git HEAD.",
     )
     gen.add_argument(
         "--file-name",
@@ -432,7 +432,7 @@ def main(args=None):
                     # only parse the PR description if it was merged after the
                     # stop date. (ignore commits that were pushed before the
                     # stop date if their PR was merged after)
-                    if repo_pr.merged_at <= stop_date:
+                    if repo_pr.merged_at.replace(tzinfo=pytz.UTC) <= stop_date:
                         desc_bodies.append((pr, "pr", repo_pr.body))
         else:
             print("Commit %s: no PR" % commit.sha)
