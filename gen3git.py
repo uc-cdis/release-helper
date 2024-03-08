@@ -103,13 +103,13 @@ class ReleaseNotes(object):
     def _get_markdown_output(self, title_text, additional_text):
         output = ""
 
-        output += "# {}\n\n".format(title_text)
+        # output += "# {}\n\n".format(title_text)
         output += additional_text.replace("\n", "\n\n") + "\n\n"
         for key, values in self.release_notes.items():
             # ignore items placed in the general description and just get following
             # sections. Don't include section if empty
             if key != "general updates" and values:
-                output += "## " + key.title() + "\n"
+                output += "#### " + key.title() + "\n"
                 for value in values:
                     output += "  - "
                     output += ReleaseNotes._breakup_line(value)
