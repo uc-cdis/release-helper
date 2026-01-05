@@ -6,15 +6,14 @@ to create release notes.
 import argparse
 import os
 import re
-import sys
-
-import requests
 from datetime import datetime, timedelta
 from enum import Enum
+
+import pytz
+import requests
 from git import Repo
 from github import Github
-from packaging.version import parse, Version, InvalidVersion
-import pytz
+from packaging.version import InvalidVersion, Version, parse
 
 _GITHUB_REMOTE = re.compile(r"git@github.com:(.*).git|https://github.com/(.*).git")
 _GITHUB_PR = re.compile(r'href="[^"]+/pull/(\d+)"', re.DOTALL)
