@@ -1,6 +1,6 @@
 [project]
 name = "gen3git"
-version = "0.8.0"
+version = "0.8.1"
 description = "Utilities to help with versioning and releasing"
 authors = [
     {name = "Center for Translational Data Science at the University of Chicago",email = "support@gen3.org"}
