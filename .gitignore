@@ -108,3 +108,5 @@ venv.bak/
 
 # Ignore Pipfile.lock for multiple Python versions
 Pipfile.lock
+
+.vscode/

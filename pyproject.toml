@@ -1,0 +1,24 @@
+[project]
+name = "gen3git"
+version = "0.8.1"
+description = "Utilities to help with versioning and releasing"
+authors = [
+    {name = "Center for Translational Data Science at the University of Chicago",email = "support@gen3.org"}
+]
+license = {text = "Apache-2.0"}
+readme = "README.md"
+requires-python = ">=3.13,<4.0"
+
+[tool.poetry.dependencies]
+pytz = ">=2025.2"
+requests = ">=2.32.5"
+pygithub = ">=2.8.1"
+gitpython = ">=3.1.46"
+packaging = ">=25.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+deptry = "^0.24.0"
