@@ -20,5 +20,8 @@ packaging = ">=25.0"
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.poetry.scripts]
+gen3git = "gen3git:main"
+
 [tool.poetry.group.dev.dependencies]
 deptry = "^0.24.0"
